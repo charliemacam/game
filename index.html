@@ -60,6 +60,8 @@
   #rotate .ic { font-size:54px; animation:rot 2s ease-in-out infinite; }
   @keyframes rot { 0%,40%{transform:rotate(0)} 60%,100%{transform:rotate(90deg)} }
   canvas { display:block; position:absolute; top:0; left:0; }
+  #cv { width:960px; height:620px; }
+  #introArt, .cdxDet .head canvas { position:static; }   /* 介绍卡图像留在卡片里，不受上面 canvas 绝对定位影响 */
   #side { position:absolute; right:0; top:0; width:280px; height:620px; background:#161b24;
     border-left:1px solid #2c3543; padding:12px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; }
   .hud { display:flex; gap:6px; flex-wrap:wrap; }
@@ -401,10 +403,16 @@
   </div>
 </div>
 
+<script src="bg/backdrop.js"></script>
+<script src="chars/sprite-runtime.js"></script>
+<script src="chars/swamp-troll.js"></script>
+<script src="chars/rainbow-giant.js"></script>
 <script>
 "use strict";
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const GW=960, GH=620;
+const RES=2;                     // 画布内部分辨率倍数（高清屏不发糊）
+cv.width=GW*RES; cv.height=GH*RES;
 const GOLD_PER_MINE=4;          // 每个矿每秒产出金币
 // 矿收益：前 5 个矿满额；第 6 个起每个产出指数衰减（÷2）
 function mineIncomeOf(n){
@@ -497,7 +505,7 @@ const NAMES_EN={
     barracks:['Barracks','Garrison','Knight Keep'] },
   enemies:{ grunt:'Grunt', runner:'Runner', armor:'Shieldbearer', flyer:'Drone Fly', boss:'Overlord',
     bossEarth:'Mountain Lord', bossSpace:'Void Sovereign', bossHell:'Magma Fiend',
-    biter:'Snapper', speeder:'Great Serpent', tanker:'Shield Captain' },
+    biter:'Snapper', speeder:'Great Serpent', tanker:'Shield Captain', swamp:'Swamp Troll', rainbow:'Rainbow Giant' },
 };
 function nmTower(key,tier){ const z=TOWERS[key].tiers[tier-1].name;
   return LANG==='en' ? (NAMES_EN.towers[key]||[])[tier-1]||z : z; }
@@ -594,7 +602,15 @@ const ENEMIES={
   biter:  { name:'撕咬虫',  hp:30,  speed:64,  armor:0,  mres:0,  r:10, color:'#ffd84a', air:false, mdmg:8  },
   speeder:{ name:'巨蛇',    hp:65,  speed:96,  armor:2,  mres:2,  r:11, color:'#5fb86a', air:false, mdmg:11 },
   tanker: { name:'盾兵长',  hp:220, speed:26,  armor:18, mres:10, r:14, color:'#697582', air:false, mdmg:20 },
+  // Charlie 原创角色（SVG 精灵动画，见 chars/）
+  swamp:  { name:'沼泽怪',  hp:170, speed:36,  armor:5,  mres:6,  r:16, color:'#d9cf3a', air:false, mdmg:15, sprite:'swampTroll' },
+  // 彩虹巨人：Charlie 标注 血量中·速度极快·攻击极高·护甲低
+  rainbow:{ name:'彩虹巨人',hp:120, speed:92,  armor:2,  mres:2,  r:15, color:'#e64032', air:false, mdmg:30, sprite:'rainbowGiant' },
 };
+// 预烘焙所有 SVG 角色的动画帧（异步，完成前用纯色圆占位）
+const SPRITES={};
+if(window.CHARS) for(const k in CHARS) CharSprites.bake(CHARS[k],150)
+  .then(b=>{ SPRITES[k]=b; }).catch(err=>console.warn('sprite bake failed',k,err));
 
 /* ---------- 7 张地图（弯曲路径，路边自动生成建造位） ---------- */
 const MAPS=[
@@ -670,6 +686,8 @@ const MAPS=[
       if(i>=4) groups.push({t:'armor',  n:1+Math.floor(i*0.3), gap:0.7});
       if(i>=6) groups.push({t:'biter',  n:Math.floor(i*0.4),   gap:0.3});
       if(i>=8) groups.push({t:'tanker', n:Math.floor(i*0.2),   gap:0.8});
+      if(i>=3) groups.push({t:'swamp',  n:1+Math.floor(i*0.25), gap:0.9});
+      if(i>=5) groups.push({t:'rainbow',n:1+Math.floor(i*0.2),  gap:0.6});
       if(i%10===0){ groups.push({t: i<30?'boss':(i<50?'bossSpace':'bossHell'), n:1, gap:0}); }
       W.push({ groups, hpMul:mul });
     }
@@ -711,6 +729,8 @@ function wavesFor(mi){
         ...(has('biter')?[{t:'biter',n:6,gap:0.35}]:[]),
         ...(has('speeder')?[{t:'speeder',n:5,gap:0.4}]:[]),
         ...(has('tanker')?[{t:'tanker',n:3,gap:0.7}]:[]),
+        {t:'swamp',n:4,gap:0.9},
+        {t:'rainbow',n:3,gap:0.6},
         {t:bt,n:1,gap:0}
       ], hpMul:1.15*k }); break; }
     const g=[{t:'grunt',n:7+i*3,gap:Math.max(0.35,0.95-i*0.05)}];
@@ -721,6 +741,8 @@ function wavesFor(mi){
     if(i>=5 && has('biter'))   g.push({t:'biter',  n:Math.ceil(i*0.7), gap:0.35});
     if(i>=6 && has('speeder')) g.push({t:'speeder',n:Math.ceil(i*0.5), gap:0.5});
     if(i>=7 && has('tanker'))  g.push({t:'tanker', n:Math.ceil(i*0.3), gap:0.8});
+    if(i>=2) g.push({t:'swamp', n:Math.ceil(i/3), gap:1.0});
+    if(i>=4) g.push({t:'rainbow', n:Math.ceil(i/4), gap:0.7});
     W.push({ groups:g, hpMul:(1+i*0.10)*k });
   }
   return W;
@@ -854,6 +876,16 @@ const CODEX={
       origin:'重甲精英部队，盾更大、刀更重。',
       habits:'同样在攻击士兵时盾会落下——但破防只在那一瞬，要把握机会。',
       traits:['解锁条件：通关 4 关','护甲极高、移速极慢','攻击士兵时短暂破防'] },
+    swamp:{
+      intro:'沼泽怪：从沼泽水里爬出来的三节甲壳怪。',
+      origin:'Charlie 设计。上黄下绿的身体是常年泡在沼泽里留下的"水位线"。',
+      habits:'用前腿末端的触手拍打拦路的士兵；被打倒后会沉回沼泽，只剩一串气泡。',
+      traits:['Charlie 原创角色','血厚、移速中等','触手近战'] },
+    rainbow:{
+      intro:'彩虹巨人：背着一座彩色尖峰王冠的螃蟹形巨怪，六条长臂。',
+      origin:'Charlie 设计。彩虹斜纹的身体上长着三张尖牙嘴，比一个人高出好几倍。',
+      habits:'横着小碎步跑得飞快，用带钳子和黄色拳头的长臂砸向拦路的士兵。',
+      traits:['Charlie 原创角色','速度极快、攻击极高','血量中等、护甲低'] },
   }
 };
 /* ---- Codex · English lore ---- */
@@ -921,6 +953,14 @@ const CODEX_EN={
       origin:'A heavy-armour elite unit with a bigger shield and heavier blade.',
       habits:'Also drops its shield to attack your troops — the breach is brief, so seize the moment.',
       traits:['Unlocks after 4 missions','Very high armour · very slow','Brief defence gap when attacking troops'] },
+    swamp:{ intro:'Swamp Troll: a three-shelled creature that crawls out of the swamp.',
+      origin:'Designed by Charlie. Its yellow-top, green-bottom body is a "waterline" from living half-submerged.',
+      habits:'Slaps blocking soldiers with the tentacles on its front legs; when beaten it sinks back into the swamp in a trail of bubbles.',
+      traits:['Original character by Charlie','Tough · medium speed','Tentacle melee'] },
+    rainbow:{ intro:'Rainbow Giant: a crab-like giant carrying a crown of rainbow spikes, with six long arms.',
+      origin:'Designed by Charlie. Its rainbow-striped body has three toothy mouths, and it towers over a person several times.',
+      habits:'Scuttles sideways at great speed and smashes blocking soldiers with its pincers and yellow fists.',
+      traits:['Original character by Charlie','Very fast · very high attack','Medium HP · low armour'] },
   },
 };
 // 一句话用于列表预览（占位常量，便于代码读取）
@@ -928,7 +968,7 @@ const CODEX_LIST_NAMES={ arrow:'箭塔系（→ 狙击塔）', mage:'法师塔�
 const CODEX_ENEMY_NAMES={
   grunt:'小兵', runner:'奔行者', armor:'重甲兵', flyer:'飞行兵', boss:'魔王',
   bossEarth:'山岳之主', bossSpace:'虚空主宰', bossHell:'熔狱魔神',
-  biter:'撕咬虫', speeder:'巨蛇', tanker:'盾兵长',
+  biter:'撕咬虫', speeder:'巨蛇', tanker:'盾兵长', swamp:'沼泽怪', rainbow:'彩虹巨人',
 };
 
 /* ---------- 路径与建造位 ---------- */
@@ -1072,7 +1112,22 @@ function towerArt(g,key,tier,R,col,empty){
     g.fillStyle='#e6e9ef'; for(let i=0;i<tier;i++){ g.beginPath(); g.arc(-R*0.4+i*R*0.4, R*0.78, 2.4,0,7); g.fill(); }
   }
 }
+// 精灵角色头顶（放血条）：脚底 + 角色内容高度
+function spriteTopY(e){ const D=CHARS[e.def.sprite], h=D.gameH||e.r*3;
+  return e.y + e.r*0.8 - (D.foot[1]-D.top)*h/D.viewBox[3]; }
+// SVG 精灵角色：场上按状态播放动画，图鉴/介绍卡画待机图标
+function spriteArt(g,e){
+  const B=SPRITES[e.def.sprite]; if(!B) return false;
+  if(e.x===undefined){ CharSprites.draw(g,B,'idle',performance.now()/1000,e.r*2.9,{mode:'icon'}); return true; }
+  const anim = e.dieT!=null ? 'die' : (e.blocker ? 'attack' : 'walk');
+  g.translate(0,e.r*0.8);             // 脚底略低于路径中心，身体落在路上
+  CharSprites.draw(g,B,anim, e.dieT!=null ? e.dieT : (e.animT||0), B.def.gameH||e.r*3,
+    {flip:e.face<0, flash:(e.hitT||0)/0.12});
+  return true;
+}
 function enemyArt(g,e){
+  if(e.def && e.def.sprite){ if(spriteArt(g,e)) return;
+    g.fillStyle=e.def.color; g.beginPath(); g.arc(0,0,e.r,0,7); g.fill(); return; }
   const R=e.r, T=e.type, att=!!e.blocker;
   const T0=performance.now()/1000;
   const swing = att ? Math.sin(T0*9) : 0;     // 攻击摆动 [-1..1]
@@ -1254,6 +1309,7 @@ class Enemy{
     this.armor=d.armor; this.mres=d.mres||0;
     this.r=d.r; this.air=d.air; this.dist=0; this.slowT=0; this.slowF=1; this.dead=false; this.leaked=false;
     this.blocker=null; this.burnT=0; this.burnDmg=0;
+    this.face=1; this.hitT=0; this.animT=Math.random()*2;   // 精灵动画用
     // 走位随机：不都贴中线（Boss 体型大走中间）
     // 选路线：Boss 走主线；其余在多线间轮流分流
     if(G){ if(type==='boss') this.route=G.routes[0];
@@ -1263,6 +1319,8 @@ class Enemy{
     if(type==='boss'){ this.sumT=6; this.blinkT=5; }     // 召唤 / 短距穿越计时
   }
   update(dt){
+    if(this.hitT>0) this.hitT-=dt;
+    this.animT += dt*(this.blocker ? 1 : this.slowF);
     if(this.slowT>0){ this.slowT-=dt; if(this.slowT<=0)this.slowF=1; }
     if(this.burnT>0){ this.burnT-=dt; this.hp-=this.burnDmg*dt; if(this.hp<=0){this.dead=true;return;} }
     // Boss：定时召唤帮手 + 概率短距离穿越
@@ -1293,6 +1351,7 @@ class Enemy{
     const p=pointAt(RT,this.dist), p2=pointAt(RT,this.dist+6);
     let vx=p2.x-p.x, vy=p2.y-p.y; const L=Math.hypot(vx,vy)||1;
     const nx=-vy/L, ny=vx/L;
+    if(Math.abs(vx)>L*0.3) this.face = vx>0 ? 1 : -1;   // 竖直路段保持原朝向
     const lane=this.lane0 + Math.sin(performance.now()/1000*this.lw+this.lph)*4;
     this.x=p.x+nx*lane; this.y=p.y+ny*lane;
     if(p.done) this.leaked=true;
@@ -1302,7 +1361,7 @@ class Enemy{
     let arm=this.armor;
     if((this.type==='armor'||this.type==='tanker') && this.blocker) arm = 0;
     const d = type==='magic' ? Math.max(1,dmg-this.mres) : Math.max(1,dmg-arm);
-    this.hp-=d; if(this.hp<=0&&!this.dead) this.dead=true; }
+    this.hp-=d; this.hitT=0.12; if(this.hp<=0&&!this.dead) this.dead=true; }
 }
 class Soldier{
   constructor(b){ this.b=b; this.maxhp=b.S.sHp; this.hp=this.maxhp; this.dmg=b.S.sDmg;
@@ -1430,8 +1489,11 @@ function startGame(mi){
   G={ mi, M, routes:M.routes, path:M.routes[0], pads:genPads(M.routes, mi), gold:200, lives:20, livesMax:20,
       clock:0, nextWaveAt:Infinity, spawnList:[],
       mines:mineCount(), waveIdx:0, totalWaves:M.waves.length, _ri:0,
-      enemies:[], pendingEnemies:[], towers:[], shots:[], blasts:[], zones:[], phase:'prep', spawnQ:[], spawnT:0,
+      enemies:[], corpses:[], pendingEnemies:[], towers:[], shots:[], blasts:[], zones:[], phase:'prep', spawnQ:[], spawnT:0,
       running:true, started:false, autoIn:0, stars:sp.stars, planets:sp.planets, theme:sp.theme };
+  // 写实太空背景（含道路），开局渲染一次缓存；失败则退回旧的简单背景
+  if(window.Backdrop){ try{ G.bg=Backdrop.render({ theme:sp.theme, variant:mi, seed:mi*977+13, routes:M.routes, W:GW, H:GH, res:RES }); }
+    catch(err){ console.warn('backdrop failed',err); G.bg=null; } }
   startMusic();
   selectedBuild=null; selectedTower=null; speed=1; paused=false; rallySetFor=null;
   if($('pausebtn')) $('pausebtn').textContent=t('pause');
@@ -1557,6 +1619,10 @@ function step(dt){
   // 清理死亡敌人的 blocker 引用
   for(const t of G.towers){ if(t.kind==='weapon') for(const s of t.soldiers)
     if(s.target&&(s.target.dead||s.target.leaked)){ if(s.target.blocker===s)s.target.blocker=null; s.target=null; } }
+  for(const e of G.enemies) if(e.dead && !e.leaked && e.def.sprite && e.x!==undefined)
+    G.corpses.push({ def:e.def, r:e.r, x:e.x, y:e.y, face:e.face, dieT:0 });
+  for(const c of G.corpses) c.dieT+=dt;
+  G.corpses=G.corpses.filter(c=>c.dieT<1.6);
   G.enemies=G.enemies.filter(e=>!e.dead&&!e.leaked);
   G.shots=G.shots.filter(s=>!s.dead);
   G.blasts=G.blasts.filter(b=>b.life>0);
@@ -1566,9 +1632,12 @@ function step(dt){
 
 /* ---------- 渲染 ---------- */
 function draw(){
+  ctx.setTransform(RES,0,0,RES,0,0);
   ctx.clearRect(0,0,GW,GH);
   if(!G){ return; }
   const T=performance.now()/1000;
+  if(G.bg){ ctx.drawImage(G.bg.canvas,0,0,GW,GH); Backdrop.drawTwinkles(ctx,G.bg.twinkles,T); }
+  else {
   // 主题背景（地球 / 宇宙 / 地狱）
   const TH=THEMES[G.theme||'space']||THEMES.space;
   let bg=ctx.createLinearGradient(0,0,GW,GH);
@@ -1592,6 +1661,7 @@ function draw(){
     ctx.strokeStyle=pass.c; ctx.lineWidth=pass.w;
     for(const rt of G.routes){ ctx.beginPath(); ctx.moveTo(rt[0][0],rt[0][1]);
       for(let i=1;i<rt.length;i++) ctx.lineTo(rt[i][0],rt[i][1]); ctx.stroke(); }
+  }
   }
   const ep=G.path[G.path.length-1];
   ctx.fillStyle='#ff6b6b'; ctx.beginPath(); ctx.arc(ep[0],ep[1],18,0,7); ctx.fill();
@@ -1661,12 +1731,14 @@ function draw(){
     ctx.fillStyle=s.col; ctx.beginPath(); ctx.arc(s.x,s.y,3,0,7); ctx.fill(); }
   for(const b of G.blasts){ const a=b.life/b.max; ctx.strokeStyle='rgba(255,150,70,'+a+')'; ctx.lineWidth=3;
     ctx.beginPath(); ctx.arc(b.x,b.y,b.r*(1.1-a*.5),0,7); ctx.stroke(); }
-  // 敌人
-  for(const e of G.enemies){ if(e.dead) continue;
+  // 死亡动画（精灵角色）
+  for(const c of G.corpses){ ctx.save(); ctx.translate(c.x,c.y); spriteArt(ctx,c); ctx.restore(); }
+  // 敌人（按 y 排序：靠下的画在前面，有前后遮挡感）
+  for(const e of [...G.enemies].sort((a,b)=>(a.y||0)-(b.y||0))){ if(e.dead) continue;
     ctx.save(); ctx.translate(e.x,e.y); enemyArt(ctx,e); ctx.restore();
     if(e.slowF<1){ ctx.strokeStyle='#7fdfff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(e.x,e.y,e.r+3,0,7); ctx.stroke(); }
     if(e.burnT>0){ ctx.strokeStyle='rgba(255,140,60,.8)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(e.x,e.y,e.r+3,0,7); ctx.stroke(); }
-    const w=e.r*2.2,hx=e.x-w/2,hy=e.y-e.r-7;
+    const w=e.r*2.2,hx=e.x-w/2,hy=e.def.sprite ? spriteTopY(e)-6 : e.y-e.r-7;
     ctx.fillStyle='#000'; ctx.fillRect(hx,hy,w,3);
     ctx.fillStyle=e.hp/e.maxhp>.4?'#5fae5f':'#d66'; ctx.fillRect(hx,hy,w*Math.max(0,e.hp/e.maxhp),3); }
   // 角落矿石指示

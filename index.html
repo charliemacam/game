@@ -404,6 +404,8 @@
 </div>
 
 <script src="bg/backdrop.js"></script>
+<script src="fx/sound.js"></script>
+<script src="fx/effects.js"></script>
 <script src="chars/sprite-runtime.js"></script>
 <script src="chars/swamp-troll.js"></script>
 <script src="chars/rainbow-giant.js"></script>
@@ -1139,8 +1141,8 @@ function towerBase(g,R,tier,col){
     g.fillStyle=tintA(col,0.35); g.beginPath(); g.arc(x,y,R*0.16,0,7); g.fill();
     g.fillStyle=tint(col,0.4); g.beginPath(); g.arc(x,y,R*0.07,0,7); g.fill(); }
 }
-function headArrow(g,R,tier,col,ang){
-  g.save(); g.rotate(ang); g.lineCap='round';
+function headArrow(g,R,tier,col,ang,kb){
+  g.save(); g.rotate(ang); g.translate(-(kb||0),0); g.lineCap='round';
   // 枪托/弩身：金属长条 + 主色条纹
   const body=(L,w)=>{ const gr=g.createLinearGradient(0,-w/2,0,w/2);
     gr.addColorStop(0,'#2a313c'); gr.addColorStop(0.4,'#8d98a6'); gr.addColorStop(1,'#161b22');
@@ -1193,9 +1195,9 @@ function headMage(g,R,tier,col,time){
     for(let i=0;i<3;i++){ const a=i*Math.PI/3; g.beginPath();
       g.moveTo(Math.cos(a)*R*0.22,-R*0.92+Math.sin(a)*R*0.22+bob); g.lineTo(-Math.cos(a)*R*0.22,-R*0.92-Math.sin(a)*R*0.22+bob); g.stroke(); } }
 }
-function headCannon(g,R,tier,col,ang){
+function headCannon(g,R,tier,col,ang,kb){
   const fire=tier>=3, W=R*(tier>=2?0.6:0.5), L=R*(tier>=2?1.35:1.25);
-  g.save(); g.rotate(ang);
+  g.save(); g.rotate(ang); g.translate(-(kb||0),0);
   if(fire){ for(const y of [-R*0.36,R*0.36]){ // 尾部燃料罐
     const gr=g.createLinearGradient(0,y-R*0.2,0,y+R*0.2); gr.addColorStop(0,'#ff9b5a'); gr.addColorStop(1,'#8a2e12');
     g.fillStyle=gr; g.strokeStyle='#0b0f15'; g.lineWidth=1; rrect(g,-R*0.85,y-R*0.17,R*0.6,R*0.34,R*0.15); g.fill(); g.stroke(); } }
@@ -1234,13 +1236,13 @@ function headBarracks(g,R,tier,col,time){
   g.beginPath(); g.moveTo(px,top); g.quadraticCurveTo(px+R*0.3,top+wv,px+R*0.6,top+R*0.12+wv);
   g.lineTo(px,top+R*0.3); g.closePath(); g.fill(); g.stroke();
 }
-function towerArt(g,key,tier,R,col,empty,ang){
-  const c=empty?'#5a5f66':col, a=ang==null?-0.75:ang, time=performance.now()/1000;
+function towerArt(g,key,tier,R,col,empty,ang,kick){
+  const c=empty?'#5a5f66':col, a=ang==null?-0.75:ang, time=performance.now()/1000, kb=(kick||0)*R*0.2;
   g.save(); g.lineJoin='round';
   towerBase(g,R,tier,c);
-  if(key==='arrow') headArrow(g,R,tier,c,a);
+  if(key==='arrow') headArrow(g,R,tier,c,a,kb);
   else if(key==='mage') headMage(g,R,tier,c,time);
-  else if(key==='cannon') headCannon(g,R,tier,c,a);
+  else if(key==='cannon') headCannon(g,R,tier,c,a,kb);
   else headBarracks(g,R,tier,c,time);
   g.restore();
 }
@@ -1493,6 +1495,7 @@ class Enemy{
     let arm=this.armor;
     if((this.type==='armor'||this.type==='tanker') && this.blocker) arm = 0;
     const d = type==='magic' ? Math.max(1,dmg-this.mres) : Math.max(1,dmg-arm);
+    if(type!=='magic' && arm>=dmg*0.5 && this.x!==undefined){ if(window.Fx) Fx.clink(this.x,this.y-this.r*0.4); sfx('clink',{x:this.x}); }
     this.hp-=d; this.hitT=0.12; if(this.hp<=0&&!this.dead) this.dead=true; }
 }
 class Soldier{
@@ -1526,6 +1529,7 @@ class Tower{
       while(this.soldiers.length+this.respawn.length<this.S.count) this.soldiers.push(new Soldier(this));
       this.soldiers.forEach(s=>{ s.maxhp=this.S.sHp; s.dmg=this.S.sDmg; }); } }
   update(dt){
+    if(this.kick>0) this.kick=Math.max(0,this.kick-dt*6);
     if(this.kind==='weapon'){ this._barracks(dt); return; }
     if(this.cool>0) this.cool-=dt;
     if(this.ammo<=0) return;
@@ -1535,7 +1539,8 @@ class Tower{
       if(dist(this.x,this.y,e.x,e.y)<=this.S.range && e.dist>best){ best=e.dist; tgt=e; } }
     if(tgt){ this.ang=Math.atan2(tgt.y-this.y,tgt.x-this.x);
       if(this.cool<=0){ this.cool=this.S.rate; this.ammo--; G.shots.push(new Shot(this,tgt));
-        if(this.key==='arrow') sfx('arrow'); else if(this.key==='mage') sfx('magic'); } }
+        sfx(FIRE_SFX[this.key][this.tier-1],{x:this.x}); this.kick=1;
+        if(window.Fx) Fx.muzzle(this.x,this.y,this.ang,this.key,this.tier); } }
   }
   _barracks(dt){
     const S=this.S;
@@ -1575,18 +1580,26 @@ class Tower{
       }
     }
     this.soldiers=this.soldiers.filter(s=>!s.dead);
+    if(fighting>0){ this.clashT=(this.clashT||0)-dt;
+      if(this.clashT<=0){ this.clashT=0.45+Math.random()*0.5; const s=this.soldiers.find(s=>s.target);
+        if(s){ sfx('clash',{x:s.x}); if(window.Fx) Fx.clink((s.x+s.target.x)/2,(s.y+s.target.y)/2-4); } } }
     if(fighting>0 && this.wp>0) this.wp=Math.max(0,this.wp - fighting*0.7*dt);
   }
 }
+// 每种塔每个等级的开火声
+const FIRE_SFX={ arrow:['arrow','longbow','sniper'], mage:['magic','arcane','frost'], cannon:['cannon','heavy','flame'] };
 class Shot{
   constructor(t,tgt){ this.x=t.x; this.y=t.y; this.tgt=tgt; this.S=t.S; this.tw=t; this.dmg=t.S.dmg;
-    this.spd=460; this.dead=false; this.col=t.def.color;
+    this.spd=460; this.dead=false; this.col=t.def.color; this.key=t.key; this.tier=t.tier; this.z=0;
+    this.d0=Math.max(1,dist(t.x,t.y,tgt.x,tgt.y));
     if(t.hasPerk('crit') && Math.random()<0.25){ this.dmg*=2; this.crit=true; } }
   update(dt){
     if(this.tgt.dead||this.tgt.leaked){ this.dead=true; return; }
     const d=dist(this.x,this.y,this.tgt.x,this.tgt.y);
     if(d<10){ this._impact(); this.dead=true; return; }
     const f=Math.min(1,(this.spd*dt)/d); this.x=lerp(this.x,this.tgt.x,f); this.y=lerp(this.y,this.tgt.y,f);
+    if(this.key==='cannon'){ const k=Math.max(0,Math.min(1,1-d/this.d0)); this.z=Math.sin(k*Math.PI)*Math.min(38,this.d0*0.3); }
+    if(window.Fx) Fx.trail(this,dt);
   }
   _impact(){ const S=this.S, P=this.tw;
     let splash=S.splash;
@@ -1594,22 +1607,27 @@ class Shot{
     if(splash>0){ for(const e of G.enemies){ if(e.dead||e.leaked) continue;
         if(dist(this.tgt.x,this.tgt.y,e.x,e.y)<=splash){ e.hit(this.dmg,S.type);
           if(S.burn && !e.dead){ e.burnT=S.burnT; e.burnDmg=S.burn; } } }
-      G.blasts.push({x:this.tgt.x,y:this.tgt.y,r:splash,life:.25,max:.25}); sfx('boom');
+      if(window.Fx) Fx.explosion(this.tgt.x,this.tgt.y,splash,!!S.burn);
+      sfx(S.burn?'fireboom':'boom',{x:this.tgt.x});
       if(P.hasPerk('napalm')) G.zones.push({x:this.tgt.x,y:this.tgt.y,r:splash*0.9,life:4,max:4,dps:(S.burn||10)}); }
     else {
       let dmg=this.dmg;
       if(P.hasPerk('shatter') && this.tgt.slowF<1) dmg=Math.round(dmg*1.4);
       this.tgt.hit(dmg,S.type);
+      const hk = this.key==='mage' ? (S.slow?'frost':'magic') : (this.tier>=3?'sniper':'arrow');
+      if(window.Fx){ Fx.hit(hk,this.tgt.x,this.tgt.y); if(this.crit) Fx.text(this.tgt.x,this.tgt.y-this.tgt.r-12,LANG==='en'?'CRIT!':'暴击!','255,90,70'); }
+      sfx(hk==='frost'?'hitFrost':hk==='magic'?'hitMagic':'hitArrow',{x:this.tgt.x});
       if(S.slow&&!this.tgt.dead){ this.tgt.slowF=S.slow; this.tgt.slowT=1.4; }
       if(P.hasPerk('pierce')){ let n=null,bd=1e9;
         for(const e of G.enemies){ if(e===this.tgt||e.dead||e.leaked) continue;
           if(e.air&&!S.air) continue;
           const dd=dist(this.tgt.x,this.tgt.y,e.x,e.y); if(dd<=70&&dd<bd){bd=dd;n=e;} }
-        if(n) n.hit(Math.round(this.dmg*0.6),S.type); }
+        if(n){ n.hit(Math.round(this.dmg*0.6),S.type); if(window.Fx) Fx.zap(this.tgt.x,this.tgt.y,n.x,n.y,'220,235,255'); } }
       if(P.hasPerk('chain')){ let n=null,bd=1e9;
         for(const e of G.enemies){ if(e===this.tgt||e.dead||e.leaked) continue;
           const dd=dist(this.tgt.x,this.tgt.y,e.x,e.y); if(dd<=120&&dd<bd){bd=dd;n=e;} }
-        if(n){ n.hit(Math.round(this.dmg*0.5),'magic'); if(S.slow){ n.slowF=S.slow; n.slowT=1.2; } } }
+        if(n){ n.hit(Math.round(this.dmg*0.5),'magic'); if(S.slow){ n.slowF=S.slow; n.slowT=1.2; }
+          if(window.Fx) Fx.zap(this.tgt.x,this.tgt.y,n.x,n.y,'150,230,255'); sfx('zap',{x:n.x}); } }
     }
   }
 }
@@ -1622,11 +1640,12 @@ function startGame(mi){
   G={ mi, M, routes:M.routes, path:M.routes[0], pads:genPads(M.routes, mi), gold:200+(M.fork?FORK_BONUS_GOLD:0), lives:20, livesMax:20,
       clock:0, nextWaveAt:Infinity, spawnList:[],
       mines:mineCount(), waveIdx:0, totalWaves:M.waves.length, _ri:0,
-      enemies:[], corpses:[], pendingEnemies:[], towers:[], shots:[], blasts:[], zones:[], phase:'prep', spawnQ:[], spawnT:0,
+      enemies:[], corpses:[], pendingEnemies:[], towers:[], shots:[], zones:[], phase:'prep', spawnQ:[], spawnT:0,
       running:true, started:false, autoIn:0, stars:sp.stars, planets:sp.planets, theme:sp.theme };
   // 写实太空背景（含道路），开局渲染一次缓存；失败则退回旧的简单背景
   if(window.Backdrop){ try{ G.bg=Backdrop.render({ theme:sp.theme, variant:mi, seed:mi*977+13, routes:M.routes, W:GW, H:GH, res:RES }); }
     catch(err){ console.warn('backdrop failed',err); G.bg=null; } }
+  if(window.Fx) Fx.reset();
   startMusic();
   selectedBuild=null; selectedTower=null; speed=1; paused=false; rallySetFor=null;
   if($('pausebtn')) $('pausebtn').textContent=t('pause');
@@ -1656,12 +1675,12 @@ function launchWave(early){
       G.gold+=r; flash(t('earlyBonus').replace('{n}',r)); }
   }
   scheduleWave(G.waveIdx);
-  G.waveIdx++; G.phase='combat'; G.started=true; G.lastWaveAt=G.clock;
+  G.waveIdx++; G.phase='combat'; G.started=true; G.lastWaveAt=G.clock; sfx('wave');
   G.nextWaveAt = (G.waveIdx<G.totalWaves) ? G.clock + WAVE_INTERVAL : Infinity;
   updateWaveBtn(); refreshHUD();
 }
 function endGame(win){
-  G.phase='done'; G.running=false;
+  G.phase='done'; G.running=false; sfx(win?'win':'lose');
   const M=G.M;
   // 无限模式：另算分（记录最佳波数）
   const EN=LANG==='en';
@@ -1743,26 +1762,34 @@ function step(dt){
   updateWaveBtn();
   for(const e of G.enemies){ if(e.dead||e.leaked) continue; e.update(dt);
     if(e.leaked){ if(e.blocker)e.blocker=null; G.lives--; flash(t('leak'));
+      sfx('leak'); if(window.Fx){ Fx.shake(4); Fx.screenFlash('255,40,40',0.35); }
       if(G.lives<=0){ refreshHUD(); endGame(false); return; } } }
   if(G.pendingEnemies.length){ for(const e of G.pendingEnemies) G.enemies.push(e); G.pendingEnemies.length=0; }
   for(const t of G.towers) t.update(dt);
   for(const s of G.shots) s.update(dt);
-  for(const b of G.blasts) b.life-=dt;
   // 燃烧地带（燃油弹特性）
   for(const z of G.zones){ z.life-=dt;
     for(const e of G.enemies){ if(e.dead||e.leaked) continue;
-      if(dist(z.x,z.y,e.x,e.y)<=z.r){ e.hp-=z.dps*dt; if(e.hp<=0) e.dead=true; } } }
+      if(dist(z.x,z.y,e.x,e.y)<=z.r){ e.hp-=z.dps*dt; if(e.hp<=0) e.dead=true; } }
+    if(window.Fx && Math.random()<dt*8){ const a=Math.random()*6.28, r=Math.random()*z.r*0.8; Fx.burn(z.x+Math.cos(a)*r,z.y+Math.sin(a)*r*0.8); } }
+  // 燃烧 / 冰冻中的敌人冒火苗、冒寒气
+  if(window.Fx) for(const e of G.enemies){ if(e.dead||e.x===undefined) continue;
+    if(e.burnT>0 && Math.random()<dt*14) Fx.burn(e.x,e.y-e.r*0.3);
+    if(e.slowF<1 && Math.random()<dt*7) Fx.chill(e.x,e.y); }
   // 清理死亡敌人的 blocker 引用
   for(const t of G.towers){ if(t.kind==='weapon') for(const s of t.soldiers)
     if(s.target&&(s.target.dead||s.target.leaked)){ if(s.target.blocker===s)s.target.blocker=null; s.target=null; } }
-  for(const e of G.enemies) if(e.dead && !e.leaked && e.def.sprite && e.x!==undefined)
-    G.corpses.push({ def:e.def, r:e.r, x:e.x, y:e.y, face:e.face, dieT:0 });
+  for(const e of G.enemies) if(e.dead && !e.leaked && e.x!==undefined){
+    const boss=e.type.startsWith('boss');
+    if(e.def.sprite) G.corpses.push({ def:e.def, r:e.r, x:e.x, y:e.y, face:e.face, dieT:0 });
+    if(window.Fx) Fx.death(e.x,e.y,e.def.color,e.r,boss);
+    sfx(boss?'bossDie':'die',{x:e.x, big:e.r>=16}); }
   for(const c of G.corpses) c.dieT+=dt;
   G.corpses=G.corpses.filter(c=>c.dieT<1.6);
   G.enemies=G.enemies.filter(e=>!e.dead&&!e.leaked);
   G.shots=G.shots.filter(s=>!s.dead);
-  G.blasts=G.blasts.filter(b=>b.life>0);
   G.zones=G.zones.filter(z=>z.life>0);
+  if(window.Fx) Fx.update(dt);
   refreshHUD();
 }
 
@@ -1771,6 +1798,7 @@ function draw(){
   ctx.setTransform(RES,0,0,RES,0,0);
   ctx.clearRect(0,0,GW,GH);
   if(!G){ return; }
+  if(window.Fx){ const [sx,sy]=Fx.offset(); ctx.translate(sx,sy); }
   const T=performance.now()/1000;
   if(G.bg){ ctx.drawImage(G.bg.canvas,0,0,GW,GH); Backdrop.drawTwinkles(ctx,G.bg.twinkles,T); }
   else {
@@ -1799,6 +1827,7 @@ function draw(){
       for(let i=1;i<rt.length;i++) ctx.lineTo(rt[i][0],rt[i][1]); ctx.stroke(); }
   }
   }
+  if(window.Fx) Fx.drawUnder(ctx);
   const ep=G.path[G.path.length-1];
   ctx.fillStyle='#ff6b6b'; ctx.beginPath(); ctx.arc(ep[0],ep[1],18,0,7); ctx.fill();
   ctx.fillStyle='#fff'; ctx.font='12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -1824,7 +1853,7 @@ function draw(){
       ctx.arc(t.x,t.y,t.S.range,0,7); ctx.fill(); ctx.strokeStyle='rgba(245,196,81,.4)'; ctx.stroke(); }
     const empty = t.kind==='ammo' && t.ammo<=0;
     ctx.save(); ctx.translate(t.x,t.y);
-    towerArt(ctx,t.key,t.tier,14,t.def.color,empty,t.ang);
+    towerArt(ctx,t.key,t.tier,14,t.def.color,empty,t.ang,t.kick);
     for(let i=0;i<t.tier;i++){ ctx.fillStyle='#f5c451'; ctx.strokeStyle='#0b0f15'; ctx.lineWidth=1;
       ctx.beginPath(); ctx.arc(-7+i*7,-22,2.6,0,7); ctx.fill(); ctx.stroke(); }
     ctx.restore();
@@ -1860,11 +1889,7 @@ function draw(){
     zg.addColorStop(0,'rgba(255,150,50,'+(0.35*a)+')'); zg.addColorStop(1,'rgba(255,90,30,0)');
     ctx.fillStyle=zg; ctx.beginPath(); ctx.arc(z.x,z.y,z.r,0,7); ctx.fill(); }
   // 子弹/爆炸
-  for(const s of G.shots){ ctx.strokeStyle=s.col; ctx.lineWidth=s.S.splash>0?4:2;
-    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(s.x-(s.tgt.x-s.x)*.06,s.y-(s.tgt.y-s.y)*.06); ctx.stroke();
-    ctx.fillStyle=s.col; ctx.beginPath(); ctx.arc(s.x,s.y,3,0,7); ctx.fill(); }
-  for(const b of G.blasts){ const a=b.life/b.max; ctx.strokeStyle='rgba(255,150,70,'+a+')'; ctx.lineWidth=3;
-    ctx.beginPath(); ctx.arc(b.x,b.y,b.r*(1.1-a*.5),0,7); ctx.stroke(); }
+  for(const s of G.shots) drawShot(s);
   // 死亡动画（精灵角色）
   for(const c of G.corpses){ ctx.save(); ctx.translate(c.x,c.y); spriteArt(ctx,c); ctx.restore(); }
   // 敌人（按 y 排序：靠下的画在前面，有前后遮挡感）
@@ -1875,11 +1900,34 @@ function draw(){
     const w=e.r*2.2,hx=e.x-w/2,hy=e.def.sprite ? spriteTopY(e)-6 : e.y-e.r-7;
     ctx.fillStyle='#000'; ctx.fillRect(hx,hy,w,3);
     ctx.fillStyle=e.hp/e.maxhp>.4?'#5fae5f':'#d66'; ctx.fillRect(hx,hy,w*Math.max(0,e.hp/e.maxhp),3); }
+  if(window.Fx) Fx.draw(ctx,GW,GH);
   // 角落矿石指示
   ctx.fillStyle='rgba(20,26,34,.82)'; ctx.strokeStyle='#344256'; ctx.lineWidth=1;
   roundRect(12,GH-44,176,32,8); ctx.fill(); ctx.stroke();
   ctx.fillStyle='#8ad6a0'; ctx.font='13px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
   ctx.fillText(t('mineHud').replace('{n}',G.mines).replace('{g}',mineIncomeOf(G.mines).toFixed(1)), 24, GH-28);
+}
+// 子弹外观：弩箭 / 狙击曳光 / 法球 / 冰晶 / 抛物线炮弹 / 火球
+function drawShot(s){
+  const a=Math.atan2(s.tgt.y-s.y,s.tgt.x-s.x), G2=window.Fx?Fx.glow:null;
+  ctx.save();
+  if(s.key==='arrow'){ ctx.translate(s.x,s.y); ctx.rotate(a);
+    if(s.tier>=3){ const tr=ctx.createLinearGradient(-38,0,0,0); tr.addColorStop(0,'rgba(255,230,160,0)'); tr.addColorStop(1,'rgba(255,240,200,.95)');
+      ctx.strokeStyle=tr; ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-38,0); ctx.lineTo(0,0); ctx.stroke(); }
+    else { ctx.strokeStyle='rgba(220,255,220,.35)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(-16,0); ctx.lineTo(-6,0); ctx.stroke();
+      ctx.strokeStyle='#e3eaf2'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(-7,0); ctx.lineTo(3,0); ctx.stroke();
+      ctx.fillStyle='#e3eaf2'; ctx.beginPath(); ctx.moveTo(6,0); ctx.lineTo(2,-2.6); ctx.lineTo(2,2.6); ctx.fill();
+      ctx.fillStyle=s.col; ctx.fillRect(-8,-2,3,4); } }
+  else if(s.key==='mage'){ const col=s.tier>=3?'150,230,255':'170,150,255';
+    if(G2){ ctx.globalCompositeOperation='lighter'; ctx.drawImage(G2(col),s.x-11,s.y-11,22,22); }
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(s.x,s.y,2.2,0,7); ctx.fill(); }
+  else { const fire=s.tier>=3, y=s.y-(s.z||0), r=s.tier>=2?4.2:3.6;
+    ctx.fillStyle='rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(s.x,s.y+2,r,r*0.6,0,0,7); ctx.fill();   // 地面影子
+    if(fire && G2){ ctx.globalCompositeOperation='lighter'; ctx.drawImage(G2('255,130,40'),s.x-12,y-12,24,24); ctx.globalCompositeOperation='source-over'; }
+    const gr=ctx.createRadialGradient(s.x-r*0.35,y-r*0.35,0.5,s.x,y,r);
+    gr.addColorStop(0,fire?'#fff2b0':'#9aa3ad'); gr.addColorStop(1,fire?'#e0552a':'#22272e');
+    ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(s.x,y,r,0,7); ctx.fill(); }
+  ctx.restore();
 }
 function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
   ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
@@ -1918,9 +1966,10 @@ function openBuildMenu(pad){
     b.appendChild(ic);
     const nm=document.createElement('div'); nm.className='nm'; nm.textContent=nmTower(k,1); b.appendChild(nm);
     const ct=document.createElement('div'); ct.className='ct'; ct.textContent=d.cost+t('gold'); b.appendChild(ct);
-    b.onclick=()=>{ if(G.gold<d.cost){ flash(t('needGold').replace('{n}',d.cost)); return; }
+    b.onclick=()=>{ if(G.gold<d.cost){ sfx('deny'); flash(t('needGold').replace('{n}',d.cost)); return; }
       if(pad.tower){ closeBuildMenu(); return; }
       G.gold-=d.cost; const tw=new Tower(k,pad); G.towers.push(tw);
+      sfx('build',{x:pad.x}); if(window.Fx) Fx.build(pad.x,pad.y);
       closeBuildMenu(); selectedTower=tw; renderSel(); refreshHUD(); };
     el.appendChild(b);
   }
@@ -1997,24 +2046,24 @@ function renderSel(){
       </div>`;
   }
   p.innerHTML=body; placePanel(p,tw);
-  const fNeed=()=>flash(LANG==='en'?'Not enough credits':'金币不足');
+  const fNeed=()=>{ sfx('deny'); flash(LANG==='en'?'Not enough credits':'金币不足'); };
   if($('bAmmo')) $('bAmmo').onclick=()=>{ const refill=S.ammoMax-tw.ammo; if(refill<=0){flash(LANG==='en'?'Ammo full':'弹药已满');return;}
     const can=Math.min(refill,Math.floor(G.gold/S.ammoCost)); if(can<=0){fNeed();return;}
-    tw.ammo+=can; G.gold-=can*S.ammoCost; refreshHUD(); renderSel(); };
+    tw.ammo+=can; G.gold-=can*S.ammoCost; sfx('reload',{x:tw.x}); refreshHUD(); renderSel(); };
   if($('bWp')) $('bWp').onclick=()=>{ const need=S.wpMax-tw.wp; if(need<=0){flash(LANG==='en'?'Weapon intact':'武器完好');return;}
     const cost=Math.ceil(need*S.repair); if(G.gold<cost){fNeed();return;}
-    tw.wp=S.wpMax; G.gold-=cost; refreshHUD(); renderSel(); };
+    tw.wp=S.wpMax; G.gold-=cost; sfx('reload',{x:tw.x}); refreshHUD(); renderSel(); };
   if($('bRally')) $('bRally').onclick=()=>{ rallySetFor = rallySetFor===tw?null:tw;
     flash(rallySetFor?(LANG==='en'?'Tap a spot in range to place the rally point':'点地图上的位置放置集结点（范围内）'):(LANG==='en'?'Cancelled':'已取消')); renderSel(); };
   if($('bUp')) $('bUp').onclick=()=>{ if(tw.tier>=3)return; const c=tw.upCost();
-    if(G.gold<c){flash(t('needGold').replace('{n}',c));return;}
-    G.gold-=c; tw.upgrade(); flash((LANG==='en'?'Upgraded to ':'已升级为 ')+nmTower(tw.key,tw.tier)+(LANG==='en'?'':'！')); refreshHUD(); renderSel(); };
+    if(G.gold<c){ sfx('deny'); flash(t('needGold').replace('{n}',c));return;}
+    G.gold-=c; tw.upgrade(); sfx('upgrade',{x:tw.x}); if(window.Fx) Fx.upgrade(tw.x,tw.y); flash((LANG==='en'?'Upgraded to ':'已升级为 ')+nmTower(tw.key,tw.tier)+(LANG==='en'?'':'！')); refreshHUD(); renderSel(); };
   if(tw.tier>=3){ const pc=Math.round(tw.def.cost*2);
     for(const pk of tw.def.perks){ const b=$('perk_'+pk.key); if(!b) continue;
       b.onclick=()=>{ if(tw.perks[pk.key]){flash(LANG==='en'?'Already owned':'已拥有该特性');return;}
-        if(G.gold<pc){flash(t('needGold').replace('{n}',pc));return;}
-        G.gold-=pc; tw.perks[pk.key]=true; flash((LANG==='en'?'Perk gained: ':'获得特性：')+perkName(pk)); refreshHUD(); renderSel(); }; } }
-  $('bSell').onclick=()=>{ G.gold+=tw.sellVal(); tw.pad.tower=null;
+        if(G.gold<pc){ sfx('deny'); flash(t('needGold').replace('{n}',pc));return;}
+        G.gold-=pc; tw.perks[pk.key]=true; sfx('perk',{x:tw.x}); if(window.Fx) Fx.upgrade(tw.x,tw.y); flash((LANG==='en'?'Perk gained: ':'获得特性：')+perkName(pk)); refreshHUD(); renderSel(); }; } }
+  $('bSell').onclick=()=>{ G.gold+=tw.sellVal(); tw.pad.tower=null; sfx('sell',{x:tw.x}); if(window.Fx) Fx.sell(tw.x,tw.y);
     G.towers=G.towers.filter(x=>x!==tw); selectedTower=null; refreshHUD(); renderSel(); };
   if($('pClose')) $('pClose').onclick=()=>{ selectedTower=null; renderSel(); };
   // 长按图标按钮 → 弹出该按钮的说明（触摸设备）；桌面靠 title 悬停
@@ -2200,54 +2249,11 @@ function stopMusic(){ if(musicTimer){ clearInterval(musicTimer); musicTimer=null
 let sfxOn = (localStorage.getItem('sh_sfx')!=='off');   // 默认开
 function ensureAC(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
   if(AC.state==='suspended') AC.resume(); return AC; }
-let _sfxNB=null;
-function sfxNoise(ac){ if(!_sfxNB){ _sfxNB=ac.createBuffer(1,ac.sampleRate*0.4,ac.sampleRate);
-  const d=_sfxNB.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; } return _sfxNB; }
-function sfx(kind){
-  if(!sfxOn) return;
+// 具体音色在 fx/sound.js；opt.x 是发声位置（左右声像）
+function sfx(kind,opt){
+  if(!sfxOn || !window.Sfx) return;
   const ac=ensureAC(); if(!ac||ac.state!=='running') return;
-  const t=ac.currentTime, out=ac.createGain(); out.connect(ac.destination);
-  if(kind==='arrow'){ out.gain.value=0.16;
-    const o=ac.createOscillator(),g=ac.createGain(); o.type='triangle';
-    o.frequency.setValueAtTime(900,t); o.frequency.exponentialRampToValueAtTime(220,t+0.1);
-    g.gain.setValueAtTime(0.9,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
-    o.connect(g); g.connect(out); o.start(t); o.stop(t+0.14);
-  } else if(kind==='magic'){ out.gain.value=0.15;
-    const o=ac.createOscillator(),g=ac.createGain(); o.type='sine';
-    o.frequency.setValueAtTime(420,t); o.frequency.exponentialRampToValueAtTime(1500,t+0.18);
-    const lf=ac.createOscillator(),lg=ac.createGain(); lf.frequency.value=30; lg.gain.value=120;
-    lf.connect(lg); lg.connect(o.frequency); lf.start(t); lf.stop(t+0.22);
-    g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.9,t+0.02);
-    g.gain.exponentialRampToValueAtTime(0.001,t+0.22); o.connect(g); g.connect(out); o.start(t); o.stop(t+0.24);
-  } else if(kind==='boom'){ out.gain.value=0.3;
-    const o=ac.createOscillator(),g=ac.createGain(); o.type='sine';
-    o.frequency.setValueAtTime(160,t); o.frequency.exponentialRampToValueAtTime(38,t+0.25);
-    g.gain.setValueAtTime(1,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.32);
-    o.connect(g); g.connect(out); o.start(t); o.stop(t+0.34);
-    const s=ac.createBufferSource(); s.buffer=sfxNoise(ac);
-    const bp=ac.createBiquadFilter(); bp.type='lowpass'; bp.frequency.value=1400;
-    const ng=ac.createGain(); ng.gain.setValueAtTime(0.7,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.3);
-    s.connect(bp); bp.connect(ng); ng.connect(out); s.start(t); s.stop(t+0.32);
-  } else if(kind==='deploy'){ out.gain.value=0.18;
-    const o=ac.createOscillator(),g=ac.createGain(); o.type='square';
-    o.frequency.setValueAtTime(180,t); o.frequency.linearRampToValueAtTime(360,t+0.12);
-    g.gain.setValueAtTime(0.7,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.16);
-    o.connect(g); g.connect(out); o.start(t); o.stop(t+0.18);
-  } else if(kind==='pause'){ out.gain.value=0.22;          // 暂停：下行双音 + 低闷击
-    const o=ac.createOscillator(),g=ac.createGain(); o.type='triangle';
-    o.frequency.setValueAtTime(660,t); o.frequency.exponentialRampToValueAtTime(220,t+0.18);
-    g.gain.setValueAtTime(0.9,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.22);
-    o.connect(g); g.connect(out); o.start(t); o.stop(t+0.24);
-    const o2=ac.createOscillator(),g2=ac.createGain(); o2.type='sine';
-    o2.frequency.setValueAtTime(120,t+0.06); o2.frequency.exponentialRampToValueAtTime(60,t+0.22);
-    g2.gain.setValueAtTime(0.6,t+0.06); g2.gain.exponentialRampToValueAtTime(0.001,t+0.26);
-    o2.connect(g2); g2.connect(out); o2.start(t+0.06); o2.stop(t+0.28);
-  } else if(kind==='resume'){ out.gain.value=0.22;         // 继续：上行双音
-    const o=ac.createOscillator(),g=ac.createGain(); o.type='triangle';
-    o.frequency.setValueAtTime(280,t); o.frequency.exponentialRampToValueAtTime(820,t+0.14);
-    g.gain.setValueAtTime(0.9,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.18);
-    o.connect(g); g.connect(out); o.start(t); o.stop(t+0.2);
-  }
+  Sfx.play(ac,kind,opt);
 }
 ['pointerdown','keydown','touchstart'].forEach(ev=>
   window.addEventListener(ev,()=>{ ensureAC(); if(musicOn) startMusic(); },{passive:true}));

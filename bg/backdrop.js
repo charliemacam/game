@@ -1,7 +1,7 @@
 /* 关卡背景：程序生成的写实太空场景（每关开局渲染一次并缓存）
  * Backdrop.render({theme, seed, routes, W, H, res}) → { canvas, twinkles }
  *   theme: 'earth' | 'space' | 'hell'；variant 0/1 选同一主题下的两种场景（不传则按 seed 随机）
- *   twinkles: 需要每帧闪烁的亮星和路灯 {x,y,r,c,ph,sp}
+ *   twinkles: 需要每帧闪烁的远处亮星 {x,y,r,c,ph,sp}
  * 画面元素：银河带 + 星云 + 多层星空 + 主题天体（行星/环/黑洞/恒星）+ 岩石栈道 + 暗角
  */
 (function(){
@@ -44,11 +44,11 @@ function pickSpot(cands,routes){ let best=cands[0], bd=-1;
   for(const c of cands){ const d=routeDist(c[0],c[1],routes); if(d>bd){ bd=d; best=c; } } return best; }
 
 const THEMES={
-  earth:{ base:['#02060b','#061420','#020509'], neb:[[30,120,140],[70,60,150],[20,70,90]], dust:0.55, lamp:[110,230,255],
+  earth:{ base:['#02060b','#061420','#020509'], neb:[[30,120,140],[70,60,150],[20,70,90]], dust:0.55,
           road:{ edge:'#15130f', base:'#4a4236', wear:'#6a5f4c' } },
-  space:{ base:['#04030c','#0b0922','#03020a'], neb:[[110,55,190],[210,70,140],[40,80,190]], dust:0.65, lamp:[170,200,255],
+  space:{ base:['#04030c','#0b0922','#03020a'], neb:[[110,55,190],[210,70,140],[40,80,190]], dust:0.65,
           road:{ edge:'#121318', base:'#3f444f', wear:'#5d6472' } },
-  hell: { base:['#0a0203','#1a0508','#050102'], neb:[[190,50,20],[110,10,35],[240,120,40]], dust:0.75, lamp:[255,150,60],
+  hell: { base:['#0a0203','#1a0508','#050102'], neb:[[190,50,20],[110,10,35],[240,120,40]], dust:0.75,
           road:{ edge:'#120807', base:'#3b2622', wear:'#58372c' } },
 };
 
@@ -84,7 +84,7 @@ function skyLayer(g,W,H,T,N,R,band){
   g.globalCompositeOperation='screen'; g.drawImage(c,0,0,W,H); g.restore();
 }
 
-function starfield(g,W,H,R,band,twinkles){
+function starfield(g,W,H,R,band,twinkles,routes){
   // 银河里的密集微星
   for(let i=0;i<2200;i++){
     const t=R()*1.4-0.2, u=(R()+R()+R()-1.5)*band.sig*0.9;
@@ -95,12 +95,14 @@ function starfield(g,W,H,R,band,twinkles){
   // 全天暗星
   for(let i=0;i<900;i++){ const r=0.3+R()*0.45;
     g.fillStyle=rgba(starColor(R),0.25+R()*0.55); g.beginPath(); g.arc(R()*W,R()*H,r,0,7); g.fill(); }
-  // 中等亮星带光晕
-  for(let i=0;i<110;i++){ const x=R()*W, y=R()*H, r=0.8+R()*0.6, c=starColor(R);
+  // 中等亮星带光晕（不落在道路附近，免得和路上的东西混在一起）
+  for(let i=0;i<70;i++){ const x=R()*W, y=R()*H, r=0.8+R()*0.6, c=starColor(R);
+    if(routeDist(x,y,routes)<44) continue;
     const gr=g.createRadialGradient(x,y,0,x,y,r*4); gr.addColorStop(0,rgba(c,0.9)); gr.addColorStop(0.3,rgba(c,0.25)); gr.addColorStop(1,rgba(c,0));
     g.fillStyle=gr; g.fillRect(x-r*4,y-r*4,r*8,r*8); }
-  // 少数极亮星：十字星芒，加入闪烁列表
-  for(let i=0;i<9;i++){ const x=R()*W, y=R()*H, c=starColor(R), L=10+R()*16;
+  // 少数远处的极亮星：十字星芒，加入闪烁列表
+  for(let i=0,n=0;i<40 && n<5;i++){ const x=R()*W, y=R()*H, c=starColor(R), L=8+R()*12;
+    if(routeDist(x,y,routes)<70) continue; n++;
     g.save(); g.globalCompositeOperation='lighter';
     for(const [dx,dy] of [[1,0],[0,1]]){ const gr=g.createLinearGradient(x-dx*L,y-dy*L,x+dx*L,y+dy*L);
       gr.addColorStop(0,rgba(c,0)); gr.addColorStop(0.5,rgba(c,0.8)); gr.addColorStop(1,rgba(c,0));
@@ -263,9 +265,9 @@ function asteroids(g,W,H,R,N,routes,n,light,col){
   }
 }
 
-/* ---------- 道路：岩石栈道 + 路面纹理 + 两侧指示灯 ---------- */
+/* ---------- 道路：岩石栈道 + 路面纹理 ---------- */
 function roadPath(g,routes){ g.beginPath(); for(const p of routes){ g.moveTo(p[0][0],p[0][1]); for(let i=1;i<p.length;i++) g.lineTo(p[i][0],p[i][1]); } }
-function road(g,W,H,res,routes,T,N,R,twinkles){
+function road(g,W,H,res,routes,T,N,R){
   const S=T.road;
   g.save(); g.lineJoin='round'; g.lineCap='round';
   g.shadowColor='rgba(0,0,0,.8)'; g.shadowBlur=22; g.strokeStyle=S.edge; g.lineWidth=64; roadPath(g,routes); g.stroke();
@@ -287,16 +289,6 @@ function road(g,W,H,res,routes,T,N,R,twinkles){
   r.fillStyle=r.createPattern(tile,'repeat'); r.fillRect(0,0,W,H);
   r.globalAlpha=0.35; r.strokeStyle=S.wear; r.lineWidth=20; roadPath(r,routes); r.stroke(); r.globalAlpha=1;
   g.drawImage(c,0,0,W,H);
-  // 两侧指示灯
-  for(const p of routes){ let acc=0;
-    for(let i=1;i<p.length;i++){ const ax=p[i-1][0], ay=p[i-1][1], dx=p[i][0]-ax, dy=p[i][1]-ay, L=Math.hypot(dx,dy)||1;
-      acc+=L; if(acc<72) continue; acc=0;
-      const nx=-dy/L, ny=dx/L;
-      for(const s of [-1,1]){ const x=p[i][0]+nx*s*28, y=p[i][1]+ny*s*28;
-        if(x<4||y<4||x>W-4||y>H-4) continue;
-        g.fillStyle='#0b0b0d'; g.beginPath(); g.arc(x,y,2.6,0,7); g.fill();
-        g.fillStyle=rgba(T.lamp,0.9); g.beginPath(); g.arc(x,y,1.3,0,7); g.fill();
-        twinkles.push({x,y,r:3.2,c:T.lamp,ph:(x+y)*0.05,sp:2.2,lamp:true}); } } }
 }
 
 /* ---------- 主入口 ---------- */
@@ -309,7 +301,7 @@ function render(o){
   g.fillStyle=gr; g.fillRect(0,0,W,H);
   const ang=(R()*0.6+0.25)*(R()<0.5?1:-1), band={ x:W*(0.3+R()*0.4), y:H*(0.3+R()*0.4), nx:Math.cos(ang), ny:Math.sin(ang), sig:70+R()*40 };
   skyLayer(g,W,H,T,N,R,band);
-  starfield(g,W,H,R,band,twinkles);
+  starfield(g,W,H,R,band,twinkles,routes);
 
   const L=(()=>{ const v=[-0.62,-0.45,0.64], m=Math.hypot(...v); return v.map(a=>a/m); })();
   if(theme==='earth'){
@@ -358,17 +350,17 @@ function render(o){
       sphere(g,W,H,px,py,230,{ ...lavaTex(N), light:v.map(a=>a/m), atmo:[255,90,40], tilt:0.4 });
     }
   }
-  road(g,W,H,res,routes,T,N,R,twinkles);
+  road(g,W,H,res,routes,T,N,R);
   gr=g.createRadialGradient(W/2,H/2,H*0.45,W/2,H/2,W*0.72);
   gr.addColorStop(0,'rgba(0,0,0,0)'); gr.addColorStop(1,'rgba(0,0,0,.55)');
   g.fillStyle=gr; g.fillRect(0,0,W,H);
   return { canvas:cv, twinkles, theme, variant };
 }
 
-// 每帧叠加：亮星和路灯的闪烁
+// 每帧叠加：远处亮星的闪烁
 function drawTwinkles(g,list,t){
   g.save(); g.globalCompositeOperation='lighter';
-  for(const s of list){ const a=s.lamp ? 0.35+0.35*Math.max(0,Math.sin(t*s.sp+s.ph)) : 0.25+0.25*Math.sin(t*s.sp+s.ph);
+  for(const s of list){ const a=0.25+0.25*Math.sin(t*s.sp+s.ph);
     const gr=g.createRadialGradient(s.x,s.y,0,s.x,s.y,s.r*2.5);
     gr.addColorStop(0,rgba(s.c,a)); gr.addColorStop(1,rgba(s.c,0));
     g.fillStyle=gr; g.fillRect(s.x-s.r*2.5,s.y-s.r*2.5,s.r*5,s.r*5); }

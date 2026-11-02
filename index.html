@@ -238,7 +238,7 @@
   .cdx h4 { font-size:14px; margin-bottom:2px; }
   .cdx .role { font-size:11px; color:#f5c451; margin-bottom:4px; }
   .cdx p { font-size:11.5px; color:#9fb0c4; line-height:1.55; max-width:none; }
-  .cdx.en h4 { color:#ff8e8e; } .cdx.tw h4 { color:#6cc6ff; }
+  .cdx.en h4 { color:#ff8e8e; } .cdx.tw h4 { color:#6cc6ff; } .cdx.ph h4 { color:#c8a8ff; }
   .cdx { cursor:pointer; transition:.12s; }
   .cdx:hover { border-color:#f5c451; transform:translateY(-2px); }
   body.touch #codexBody { grid-template-columns:1fr; }
@@ -248,7 +248,7 @@
   .cdxDet .head { display:flex; gap:14px; align-items:center; margin-bottom:6px; }
   .cdxDet .head canvas { flex:none; }
   .cdxDet .head .nm { font-size:24px; font-weight:bold; }
-  .cdxDet.en .nm { color:#ff8e8e; } .cdxDet.tw .nm { color:#6cc6ff; }
+  .cdxDet.en .nm { color:#ff8e8e; } .cdxDet.tw .nm { color:#6cc6ff; } .cdxDet.ph .nm { color:#c8a8ff; }
   .cdxDet .role { font-size:12px; color:#f5c451; }
   .cdxDet .intro { font-size:14px; color:#cfe; margin:4px 0 12px; font-style:italic; }
   .cdxDet h5 { font-size:12px; color:#93a1b5; letter-spacing:2px; margin:10px 0 4px; }
@@ -403,8 +403,10 @@
   </div>
 </div>
 
+<script src="maps/levels.js"></script>
 <script src="bg/backdrop.js"></script>
 <script src="fx/sound.js"></script>
+<script src="fx/music.js"></script>
 <script src="fx/effects.js"></script>
 <script src="chars/sprite-runtime.js"></script>
 <script src="chars/swamp-troll.js"></script>
@@ -457,11 +459,11 @@ const TXT = {
   setClose:'▶ 关闭并继续', setHome:'≡ 回到主菜单',
   adminOn:'🔓 管理员：解锁全部关卡', adminOff:'🔒 关闭管理员（重置进度）',
   setHint:'打开设置时游戏自动暂停，关闭后自动继续。',
-  introNew:'⚠ 新敌人登场', introCont:'▶ 继续',
+  introNew:'⚠ 新敌人登场', introPhen:'✦ 新星象出现', introCont:'▶ 继续',
   hudGold:'金币', hudLife:'生命', hudWave:'波次', hudMine:'矿',
   supplyAll:'⚙ 全部补给（弹药+武器）',
   pause:'⏸ 暂停', resume:'▶ 继续', settings:'⚙ 设置',
-  sideHint:'<b>点路边的建造位</b>选建筑。点已建的塔可升级；满级买特性。塔弹药耗尽会停火；兵营士兵不耗弹药但武器会损耗。',
+  sideHint:'<b>点路边的建造位</b>选建筑。点已建的塔可升级，<b>双击塔一键补满弹药</b>；满级买特性。塔弹药耗尽会停火；兵营士兵不耗弹药但武器会损耗。',
   mineHud:'⛏ 矿 × {n}   +{g} 金/秒', mineHdr:'（当前 {n} 矿 · +{g} 金/秒）',
   wave1:'▶ 开始第 1 波', waveEarly:'▶ 提前 第 {n} 波（{s}s · +{g}金）', waveDone:'全部波次已派出',
   waveLocked:'⏳ 第 {n} 波 · {s}s 后可提前',
@@ -492,11 +494,11 @@ const TXT = {
   setClose:'▶ Close & Resume', setHome:'≡ Main Menu',
   adminOn:'🔓 Admin: Unlock All Missions', adminOff:'🔒 Disable Admin (Reset)',
   setHint:'Opening Settings pauses the game; closing resumes it.',
-  introNew:'⚠ New Hostile Detected', introCont:'▶ Continue',
+  introNew:'⚠ New Hostile Detected', introPhen:'✦ New Phenomenon', introCont:'▶ Continue',
   hudGold:'Credits', hudLife:'Lives', hudWave:'Wave', hudMine:'Rigs',
   supplyAll:'⚙ Resupply All (Ammo + Weapons)',
   pause:'⏸ Pause', resume:'▶ Resume', settings:'⚙ Settings',
-  sideHint:'<b>Tap a build pad</b> beside the route to pick a structure. Tap a built tower to upgrade; buy two perks at max tier. Towers stop firing when out of ammo; barracks troops use no ammo but their weapons wear down.',
+  sideHint:'<b>Tap a build pad</b> beside the route to pick a structure. Tap a built tower to upgrade; <b>double-tap a tower to refill it</b>; buy two perks at max tier. Towers stop firing when out of ammo; barracks troops use no ammo but their weapons wear down.',
   mineHud:'⛏ Rigs × {n}   +{g}/s', mineHdr:'(Rigs: {n} · +{g}/s)',
   wave1:'▶ Launch Wave 1', waveEarly:'▶ Send Wave {n} early ({s}s · +{g})', waveDone:'All waves launched',
   waveLocked:'⏳ Wave {n} · call early in {s}s',
@@ -631,67 +633,20 @@ const SPRITES={};
 if(window.CHARS) for(const k in CHARS) CharSprites.bake(CHARS[k],150)
   .then(b=>{ SPRITES[k]=b; }).catch(err=>console.warn('sprite bake failed',k,err));
 
-/* ---------- 7 张地图（弯曲路径，路边自动生成建造位） ---------- */
-const MAPS=[
-  { name:'新手村',   diff:'mid',  lives:20,
-    path:[[0,120],[200,120],[200,300],[420,300],[420,140],[640,140],[640,420],[860,420],[860,260],[960,260]] },
-  { name:'林间小道', diff:'mid',  lives:20,
-    path:[[0,500],[150,500],[150,260],[330,260],[330,480],[520,480],[520,200],[700,200],[700,440],[860,440],[860,120],[960,120]] },
-  { name:'曲折峡谷', diff:'mid',  lives:18, fork:1,
-    routes:[ [[0,110],[210,110],[210,330],[440,330],[440,110],[680,110],[680,500],[960,500]],
-             [[0,110],[210,110],[210,500],[440,500],[440,330],[680,330],[680,500],[960,500]] ] },
-  { name:'回环要塞', diff:'hard', lives:18,
-    path:[[0,300],[160,300],[160,120],[360,120],[360,320],[180,320],[180,500],[480,500],[480,160],[660,160],[660,420],[840,420],[840,220],[960,220]] },
-  { name:'蛇形山道', diff:'hard', lives:16, fork:1,
-    routes:[ [[0,90],[180,90],[180,300],[420,300],[420,90],[660,90],[660,520],[960,520]],
-             [[0,90],[180,90],[180,520],[420,520],[420,300],[660,300],[660,520],[960,520]] ] },
-  { name:'熔岩迷宫', diff:'hard', lives:16,
-    path:[[120,0],[120,200],[300,200],[300,60],[480,60],[480,300],[260,300],[260,480],[520,480],[520,220],[720,220],[720,460],[880,460],[880,200],[700,200],[700,40],[960,40]] },
-  { name:'终焉回廊', diff:'hard', lives:15, fork:1,
-    routes:[ [[0,520],[200,520],[200,300],[440,300],[440,520],[680,520],[680,120],[960,120]],
-             [[0,520],[200,520],[200,120],[440,120],[440,300],[680,300],[680,120],[960,120]] ] },
-];
-/* ---------- 程序生成其余关卡（主线 + 3 系列奖励关） ---------- */
+/* ---------- 关卡地图：路线、关键塔位、虫洞、黑洞都在 maps/levels.js ---------- */
+const MAPS=[];
 (function(){
-  const mainNames=['幽暗星带','陨石走廊','环带禁区','虚空裂隙','红巨星轨','寒冰光环','离子风暴',
-    '黑洞边境','遗迹星系','双子星阱','末日轨道'];
-  const mainNamesEn=['Gloomstar Belt','Meteor Corridor','Forbidden Ring','Void Rift','Red Giant Orbit',
-    'Frostlight Halo','Ion Storm','Black Hole Frontier','Relic Galaxy','Twin Star Trap','Doomsday Orbit'];
-  const bonusSeries=[
-    ['极光之穹','极光迷宫','极光要塞'],
-    ['星渊回响 I','星渊回响 II','星渊回响 III'],
-    ['终焉之门 I','终焉之门 II','终焉之门 III'],
-  ];
-  const bonusSeriesEn=[
-    ['Aurora Dome','Aurora Maze','Aurora Bastion'],
-    ['Abyssal Echo I','Abyssal Echo II','Abyssal Echo III'],
-    ['Endgate I','Endgate II','Endgate III'],
-  ];
-  function serp(seed,cols,up){ const TOP=88,BOT=536,pts=[]; pts.push([0,up?TOP:BOT]);
-    for(let i=1;i<=cols;i++){ const x=Math.round(i*960/(cols+1)), y=up?TOP:BOT;
-      pts.push([x,y]); pts.push([x,up?BOT:TOP]); up=!up; }
-    const l=pts[pts.length-1]; pts.push([960,l[1]]); return pts; }
-  let gi=0;
-  while(MAPS.length<LEVELS){
-    const idx=MAPS.length, seed=idx*73+17, cols=4+(idx%3);
-    let nm,nmEn;
-    if(idx<18){
-      nm = mainNames[gi%mainNames.length]; nmEn = mainNamesEn[gi%mainNamesEn.length];
-    } else {
-      const series=Math.floor((idx-18)/3), inSeries=(idx-18)%3;
-      nm = bonusSeries[series][inSeries]; nmEn = bonusSeriesEn[series][inSeries];
-    }
-    const fork = (gi%3===2);
-    if(fork){
-      const A=serp(seed,cols,true), B=serp(seed+50,cols,false);
-      A[0]=[0,312]; B[0]=[0,312]; A[A.length-1]=[960,312]; B[B.length-1]=[960,312];
-      MAPS.push({ name:nm, nameEn:nmEn, diff:'hard', lives:14, fork:1, routes:[A,B], bonus: idx>=18 });
-    } else {
-      MAPS.push({ name:nm, nameEn:nmEn, diff: idx>11?'hard':'mid', lives: idx>11?13:16, bonus: idx>=18,
-        path:serp(seed,cols, idx%2===0) });
-    }
-    gi++;
-  }
+  const D=window.LEVEL_DESIGNS;
+  const bonusNames=['极光之穹','极光迷宫','极光要塞','星渊回响 I','星渊回响 II','星渊回响 III','终焉之门 I','终焉之门 II','终焉之门 III'];
+  const bonusNamesEn=['Aurora Dome','Aurora Maze','Aurora Bastion','Abyssal Echo I','Abyssal Echo II','Abyssal Echo III','Endgate I','Endgate II','Endgate III'];
+  // 每关生命数（多入口/分叉关略多给一点）
+  const LIVES=[20,20,18,18,16,16,16,16,16,14,16,14,13,14,13,13,14,13, 13,14,14,13,13,14,13,14,13];
+  D.campaign.forEach((d,i)=>{
+    const multi=d.routes.length>1;
+    MAPS.push({ name:i>=18?bonusNames[i-18]:'', nameEn:i>=18?bonusNamesEn[i-18]:'', bonus:i>=18,
+      diff:(i<3||(i>=6&&i<12&&!multi))?'mid':'hard', lives:LIVES[i]||13, fork:multi?1:0,
+      routes:d.routes, keys:d.keys||[], padN:d.n, worms:d.worms||[], holes:d.holes||[], intro:d.story||null, hp:d.hp||1 });
+  });
   // ---- 无限模式：两个独立条目，不计入 LEVELS ----
   function endlessWaves(level){
     const W=[], k = level===1?1.0:1.6;
@@ -712,12 +667,11 @@ const MAPS=[
     }
     return W;
   }
-  const eA=serp(1234,5,true), eB1=serp(2345,5,true), eB2=serp(3456,5,false);
-  eB1[0]=[0,312]; eB2[0]=[0,312]; eB1[eB1.length-1]=[960,312]; eB2[eB2.length-1]=[960,312];
-  MAPS.push({ name:'无限模式 · 简单', nameEn:'Endless · Easy', diff:'hard', lives:20, endless:true, eLevel:1,
-    path:eA, waves:endlessWaves(1) });
-  MAPS.push({ name:'无限模式 · 困难', nameEn:'Endless · Hard', diff:'hard', lives:20, endless:true, eLevel:2, fork:1,
-    routes:[eB1,eB2], waves:endlessWaves(2) });
+  D.endless.forEach((d,j)=>{
+    MAPS.push({ name:j?'无限模式 · 困难':'无限模式 · 简单', nameEn:j?'Endless · Hard':'Endless · Easy', diff:'hard', lives:20,
+      endless:true, eLevel:j+1, fork:d.routes.length>1?1:0, routes:d.routes, keys:d.keys||[], padN:d.n,
+      worms:d.worms||[], holes:d.holes||[], waves:endlessWaves(j+1) });
+  });
 })();
 
 // 渐进解锁敌种：每通一关多 1 种，封顶为基础 5 + 3 个变种
@@ -736,7 +690,7 @@ function bossFor(mi){
   return 'boss';
 }
 function wavesFor(mi){
-  const k=(1+HP_GROWTH*Math.min(mi,9)+HP_GROWTH_LATE*Math.max(0,mi-9))*(EASE_FIRST[mi]||1)
+  const k=(1+HP_GROWTH*Math.min(mi,9)+HP_GROWTH_LATE*Math.max(0,mi-9))*(EASE_FIRST[mi]||1)*((MAPS[mi]&&MAPS[mi].hp)||1)
           *(MAPS[mi]&&MAPS[mi].fork ? 1-FORK_HP_EASE*mi : 1), W=[];
   const tut=(mi===0);                       // 第 1 关是教学关：飞行兵晚出、少出
   const pool=enemyPool();
@@ -786,6 +740,9 @@ function wavesFor(mi){
 MAPS.forEach((m,i)=>{ if(!m.endless) m.waves=wavesFor(i); });   // 开局时还会按最新解锁重算
 // 统一：单线地图也包成 routes；m.path = 主线（兼容旧引用）
 MAPS.forEach(m=>{ if(!m.routes) m.routes=[m.path]; m.routes=m.routes.map(smoothPath); m.path=m.routes[0]; });
+MAPS.forEach(m=>{ m.worms=m.worms.map(w=>{ const ra=m.routes[w.a[0]], rb=m.routes[w.b[0]];
+  const da=pathLen(ra)*w.a[1], db=pathLen(rb)*w.b[1], A=pointAt(ra,da), B=pointAt(rb,db);
+  return { ra:w.a[0], rb:w.b[0], da, db, ax:A.x, ay:A.y, bx:B.x, by:B.y, open:w.open, cycle:w.cycle, phase:w.phase||0 }; }); });
 
 /* ---------- 战役故事线：18 章（宇宙空间命名 + 剧情） ---------- */
 const SAGA=[
@@ -799,14 +756,14 @@ const SAGA=[
  {name:'幽暗星带',  s:'光无法抵达之地。猎人凭矿脉的微光与战鼓前行，\n虫潮一波猛过一波。'},
  {name:'陨石走廊',  s:'破碎行星化作致命走廊。\n每一处建造位都来之不易，算准每一枚炮弹。'},
  {name:'环带禁区',  s:'被公会标记为禁区的死亡环带，双线并涌。\n传言深处藏着虫群的「巢导体」。'},
- {name:'虚空裂隙',  s:'空间在此撕开裂隙，虫群从裂缝中倾泻。\n猎人逼近虫巢的外围防线。'},
- {name:'红巨星轨', s:'垂死的红巨星照亮战场。\n虫群的精锐——重甲与飞行体——倾巢而出。'},
- {name:'寒冰光环',  s:'冰封星环下，魔王的低语第一次清晰传来。\n它在召唤，也在等待。'},
+ {name:'虚空裂隙',  s:'空间在此撕开裂隙，裂隙时开时合，成了虫洞。\n虫洞开启时，虫群会从入口直接钻到出口，绕过半条防线。守住出口！'},
+ {name:'红巨星轨', s:'垂死的红巨星照亮战场，一道虫洞横穿星轨。\n虫群的精锐（重甲与飞行体）倾巢而出。'},
+ {name:'寒冰光环',  s:'冰封星环下，两道虫洞轮流开合。魔王的低语第一次清晰传来。\n它在召唤，也在等待。'},
  {name:'离子风暴',  s:'狂暴的离子风暴中，双线虫潮几乎不留喘息。\n坚持住，源头已近。'},
- {name:'黑洞边境',  s:'引力edge将一切吞没。猎人在黑洞边境立下最后的矿场，\n背水一战。'},
- {name:'遗迹星系',  s:'湮灭文明的遗迹群——虫群的孵化母巢就藏于此。\n清剿巢穴，斩断虫潮之源。'},
- {name:'双子星阱', s:'双子星的引力陷阱，虫群与魔王的卫队双线合击。\n终末之门已在眼前。'},
- {name:'终末之门',  s:'虚蚀魔王盘踞于终末之门之后。\n星海赏金猎人最后的猎杀——为了所有殖民星系的灯火。'},
+ {name:'黑洞边境',  s:'黑洞的引力边缘吞没一切。靠近它，时间会变慢：虫群慢，炮塔也慢。\n引力潮汐不时把虫群拖回去。猎人在边境立下最后的矿场，背水一战。'},
+ {name:'遗迹星系',  s:'湮灭文明的遗迹群，虫群的孵化母巢就藏于此。\n虫洞的出口正落在黑洞旁：钻过来的虫群会被时间拖慢。'},
+ {name:'双子星阱', s:'两颗黑洞互相绕转，组成引力陷阱。虫群与魔王的卫队双线合击。\n终末之门已在眼前。'},
+ {name:'终末之门',  s:'虚蚀魔王盘踞于终末之门之后，虫洞与黑洞守着最后的道路。\n星海赏金猎人最后的猎杀，为了所有殖民星系的灯火。'},
 ];
 const SAGA_EN=[
  {name:'Dawnlight Belt', s:'Era 3187. The Void Blight swarm stirs from the deep void, devouring colony systems.\nThe Bounty Hunters’ Guild sounds the alarm at the home belt — the hunt begins here.'},
@@ -819,14 +776,14 @@ const SAGA_EN=[
  {name:'Gloomstar Belt', s:'A place light cannot reach. The hunter advances by faint ore-glow and drums,\neach wave fiercer than the last.'},
  {name:'Meteor Corridor',s:'Shattered planets become a deadly corridor.\nEvery build pad is hard-won — count each shell.'},
  {name:'Forbidden Ring', s:'A death-ring the Guild marked off-limits, twin lanes surging.\nRumour says the swarm’s hive-conductor lies deep within.'},
- {name:'Void Rift',      s:'Space tears open here, and the swarm spills from the cracks.\nThe hunter nears the hive’s outer defences.'},
- {name:'Red Giant Orbit',s:'A dying red giant lights the battlefield.\nThe swarm’s elite — armoured and airborne — pour out in force.'},
- {name:'Frostlight Halo',s:'Beneath the frozen star-ring, the Overlord’s whisper comes clear at last.\nIt is summoning — and waiting.'},
+ {name:'Void Rift',      s:'Space tears open here; the rift pulses open and shut, a wormhole.\nWhile open, the swarm slips from its mouth to its exit and skips half the defence. Hold the exit!'},
+ {name:'Red Giant Orbit',s:'A dying red giant lights the battlefield, a wormhole cutting across its orbit.\nThe swarm’s elite, armoured and airborne, pour out in force.'},
+ {name:'Frostlight Halo',s:'Beneath the frozen star-ring two wormholes open in turn, and the Overlord’s whisper comes clear at last.\nIt is summoning, and waiting.'},
  {name:'Ion Storm',      s:'In the raging ion storm, twin swarm-tides leave barely a breath.\nHold fast — the source is near.'},
- {name:'Black Hole Frontier', s:'Gravity’s edge devours all. The hunter raises a final rig here,\nbacks to the wall.'},
- {name:'Relic Galaxy',   s:'The ruins of an annihilated civilisation — the swarm’s breeding hive hides here.\nClear the nest, sever the tide at its source.'},
- {name:'Twin Star Trap', s:'The gravity trap of a binary star; swarm and Overlord’s guard strike two lanes.\nThe Final Gate is in sight.'},
- {name:'The Final Gate', s:'The Void Overlord broods beyond the Final Gate.\nThe deep-space hunter’s last hunt — for the lights of every colony.'},
+ {name:'Black Hole Frontier', s:'Gravity’s edge devours all. Near it time slows: the swarm crawls, and so do the guns.\nGravity tides drag the swarm back. The hunter raises a final rig here, backs to the wall.'},
+ {name:'Relic Galaxy',   s:'The ruins of an annihilated civilisation hide the swarm’s breeding hive.\nA wormhole’s exit opens beside a black hole: whatever comes through is dragged into slow time.'},
+ {name:'Twin Star Trap', s:'Two black holes circle each other in a gravity trap; swarm and Overlord’s guard strike two lanes.\nThe Final Gate is in sight.'},
+ {name:'The Final Gate', s:'The Void Overlord broods beyond the Final Gate, wormholes and a black hole guarding the last road.\nThe deep-space hunter’s last hunt, for the lights of every colony.'},
 ];
 MAPS.forEach((m,i)=>{ if(SAGA[i]){ m.name=SAGA[i].name; m.story=SAGA[i].s;
   if(SAGA_EN[i]){ m.nameEn=SAGA_EN[i].name; m.storyEn=SAGA_EN[i].s; } } });
@@ -1046,37 +1003,46 @@ function minPathDist(px,py,p){ let m=1e9; for(let i=1;i<p.length;i++) m=Math.min
 function minRoutesDist(px,py,routes){ let m=1e9; for(const p of routes){ const v=minPathDist(px,py,p); if(v<m)m=v; } return m; }
 function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a);
   t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
-// 建造位数量控制：
-//   目标数 = clamp( 路网总长 / SPACING , MIN , MAX )
-//   SPACING≈每多少像素路给 1 个塔位（越大→塔位越少）；按各路线长度比例分配；
-//   位置非均匀（有簇有疏），分叉关也不会爆量（封顶 MAX）。
-const PAD_SPACING=240, PAD_MIN=8, PAD_MAX=15;
-function genPads(routes, seed){
-  const rnd=mulberry32(((seed|0)+1)*99991), pads=[];
-  const lens=routes.map(pathLen), total=lens.reduce((a,b)=>a+b,0);
-  const target=Math.max(PAD_MIN, Math.min(PAD_MAX, Math.round(total/PAD_SPACING)));
-  for(let ri=0;ri<routes.length;ri++){
-    const path=routes[ri], plen=lens[ri];
-    const want=Math.max(2, Math.round(target*plen/total));
-    const avg=plen/(want+1);
-    let placed=0, tries=0, d=avg*(0.45+rnd()*0.4);
-    while(placed<want && tries<want*10 && d<plen-28){
-      tries++;
-      const a=pointAt(path,d), b=pointAt(path,Math.min(d+5,plen));
-      let nx=-(b.y-a.y), ny=(b.x-a.x); const L=Math.hypot(nx,ny)||1; nx/=L; ny/=L;
-      const off=52 + (rnd()*16-2);
-      let put=false;
-      for(const s of (rnd()<0.5?[1,-1]:[-1,1])){
-        const px=a.x+nx*off*s, py=a.y+ny*off*s;
-        if(px<24||px>936||py<24||py>596) continue;
-        if(minRoutesDist(px,py,routes)<46) continue;            // 远离任何一条路
-        if(pads.some(q=>dist(q.x,q.y,px,py)<54)) continue;       // 塔位之间留间距
-        pads.push({x:px,y:py,tower:null}); placed++; put=true; break;
-      }
-      // 非均匀步进：约 30% 形成密集簇，其余拉开大间隔
-      d += put ? (rnd()<0.30 ? avg*(0.4+rnd()*0.3) : avg*(0.95+rnd()*0.7))
-               : avg*0.5;
-    }
+// 战术塔位：先放关卡指定的关键塔位，再贪心补齐。
+//   候选点：离路 50~105 像素、避开界面按钮、黑洞核心、虫洞口、终点基地；
+//   得分 = 射程内路段的「未被覆盖程度」之和 × 多段加成（能同时打到几段不同的路）；
+//   已被多个塔位覆盖的路段权重递减，所以既会选出火力交汇点，也会照顾到每一段路。
+const PAD_RANGE=125, PAD_GAP=58;
+function padBlocked(M,x,y){
+  if(x<26||x>934||y<26||y>594) return true;
+  if((x<112&&y<72)||(x<200&&y>560)) return true;                       // 左上按钮、左下矿石指示
+  if(M.holes.some(h=>dist(x,y,h.x,h.y)<62)) return true;
+  if(M.worms.some(w=>dist(x,y,w.ax,w.ay)<42||dist(x,y,w.bx,w.by)<42)) return true;
+  return M.routes.some(r=>{ const e=r[r.length-1]; return dist(x,y,e[0],e[1])<62; });
+}
+function tacticalPads(M,seed){
+  const routes=M.routes, rnd=mulberry32(((seed|0)+1)*99991);
+  const total=routes.reduce((s,r)=>s+pathLen(r),0);
+  const N=M.padN || Math.max(9,Math.min(15,Math.round(total/230)));
+  const S=[];
+  routes.forEach((r,ri)=>{ const L=pathLen(r); for(let d=6;d<L-6;d+=10){ const p=pointAt(r,d); S.push({x:p.x,y:p.y,ri,d}); } });
+  const cover=(x,y)=>{ const cov=[]; for(let i=0;i<S.length;i++){ const q=S[i];
+    if(Math.abs(q.x-x)<=PAD_RANGE && Math.abs(q.y-y)<=PAD_RANGE && dist(q.x,q.y,x,y)<=PAD_RANGE) cov.push(i); } return cov; };
+  // 覆盖到几段不连续的路（同一条路线上距离跳跃 > 30 视为另一段）
+  const segs=cov=>{ let n=0, pr=-1, pd=-99; for(const i of cov){ const q=S[i]; if(q.ri!==pr||q.d-pd>30) n++; pr=q.ri; pd=q.d; } return n; };
+  const cands=[];
+  for(let y=30;y<=590;y+=10) for(let x=30;x<=930;x+=10){
+    if(padBlocked(M,x,y)) continue;
+    const rd=minRoutesDist(x,y,routes); if(rd<50||rd>105) continue;
+    const cov=cover(x,y); if(cov.length<4) continue;
+    cands.push({x,y,rd,cov,segs:segs(cov),j:0.92+rnd()*0.16}); }
+  const pads=[], hit=new Float32Array(S.length);
+  const take=(x,y,cov)=>{ pads.push({x,y,tower:null}); for(const i of cov) hit[i]++; };
+  for(const [x,y] of M.keys||[]) take(x,y,cover(x,y));
+  while(pads.length<N){
+    let best=null, bs=0;
+    for(const c of cands){
+      if(pads.some(p=>Math.abs(p.x-c.x)<PAD_GAP && dist(p.x,p.y,c.x,c.y)<PAD_GAP)) continue;
+      let sc=0; for(const i of c.cov) sc+=1/(1+hit[i]*1.6);
+      sc*=(1+0.3*(Math.min(c.segs,4)-1))*(c.rd<72?1:0.85)*c.j;
+      if(sc>bs){ bs=sc; best=c; } }
+    if(!best) break;
+    take(best.x,best.y,best.cov);
   }
   return pads;
 }
@@ -1480,7 +1446,12 @@ class Enemy{
     }
     if(this.blocker && !this.blocker.dead) return;        // 被士兵拦住，不前进
     if(this.blocker && this.blocker.dead) this.blocker=null;
-    this.dist+=this.speed*this.slowF*dt;
+    const d0=this.dist;
+    this.dist+=this.speed*this.slowF*timeDil(this.x,this.y,0.5)*dt;
+    // 虫洞开启时：走过入口的敌人瞬间出现在出口（可能换到另一条路线）
+    for(const w of G.worms){ if(!w.isOpen || this.route!==G.routes[w.ra] || d0>=w.da || this.dist<w.da) continue;
+      this.route=G.routes[w.rb]; this.dist=w.db+(this.dist-w.da);
+      if(window.Fx) Fx.warp(w.ax,w.ay,w.bx,w.by); sfx('warp',{x:w.bx}); break; }
     const RT=this.route||G.path;
     const p=pointAt(RT,this.dist), p2=pointAt(RT,this.dist+6);
     let vx=p2.x-p.x, vy=p2.y-p.y; const L=Math.hypot(vx,vy)||1;
@@ -1503,9 +1474,14 @@ class Soldier{
     this.x=b.x; this.y=b.y; this.dead=false; this.target=null; }
   reset(){ this.hp=this.maxhp; this.dead=false; this.x=this.b.x; this.y=this.b.y; this.target=null; }
 }
+// 黑洞时间膨胀：在膨胀圈里越靠近中心越慢；k = 圈心处的最大减速比例
+function timeDil(x,y,k){ let f=1;
+  if(G && G.holes) for(const h of G.holes){ const d=dist(x,y,h.x,h.y); if(d<h.r) f=Math.min(f,1-k*(1-d/h.r)); }
+  return f; }
 class Tower{
   constructor(key,pad){ this.key=key; this.def=TOWERS[key]; this.pad=pad; this.x=pad.x; this.y=pad.y;
     this.tier=1; this.cool=0; this.ang=-0.75; this.perks={}; pad.tower=this; this._apply();
+    this.dil=timeDil(this.x,this.y,0.35);                // 黑洞附近的塔攻速变慢
     if(this.kind==='ammo') this.ammo=this.S.ammoMax;
     if(this.kind==='weapon'){ this.wp=this.S.wpMax; this.soldiers=[]; this.respawn=[];
       this.rally=this._rally(); for(let i=0;i<this.S.count;i++) this.soldiers.push(new Soldier(this)); sfx('deploy'); } }
@@ -1531,7 +1507,7 @@ class Tower{
   update(dt){
     if(this.kick>0) this.kick=Math.max(0,this.kick-dt*6);
     if(this.kind==='weapon'){ this._barracks(dt); return; }
-    if(this.cool>0) this.cool-=dt;
+    if(this.cool>0) this.cool-=dt*this.dil;
     if(this.ammo<=0) return;
     let tgt=null,best=-1;
     for(const e of G.enemies){ if(e.dead||e.leaked) continue;
@@ -1637,20 +1613,24 @@ function startGame(mi){
   const M=MAPS[mi];
   if(!M.endless) M.waves=wavesFor(mi);   // 按当前已解锁的敌种生成（通关后不用刷新页面）
   const sp=genSpace(M.routes, themeFor(mi));
-  G={ mi, M, routes:M.routes, path:M.routes[0], pads:genPads(M.routes, mi), gold:200+(M.fork?FORK_BONUS_GOLD:0), lives:20, livesMax:20,
+  G={ mi, M, routes:M.routes, path:M.routes[0], pads:tacticalPads(M, mi), gold:200+(M.fork?FORK_BONUS_GOLD:0), lives:20, livesMax:20,
       clock:0, nextWaveAt:Infinity, spawnList:[],
       mines:mineCount(), waveIdx:0, totalWaves:M.waves.length, _ri:0,
       enemies:[], corpses:[], pendingEnemies:[], towers:[], shots:[], zones:[], phase:'prep', spawnQ:[], spawnT:0,
       running:true, started:false, autoIn:0, stars:sp.stars, planets:sp.planets, theme:sp.theme };
   // 写实太空背景（含道路），开局渲染一次缓存；失败则退回旧的简单背景
-  if(window.Backdrop){ try{ G.bg=Backdrop.render({ theme:sp.theme, variant:mi, seed:mi*977+13, routes:M.routes, W:GW, H:GH, res:RES }); }
+  if(window.Backdrop){ try{ G.bg=Backdrop.render({ theme:sp.theme, variant:mi, seed:mi*977+13, routes:M.routes, pads:G.pads, holes:M.holes, W:GW, H:GH, res:RES }); }
     catch(err){ console.warn('backdrop failed',err); G.bg=null; } }
+  G.worms=M.worms.map(w=>({...w,isOpen:false}));
+  G.holes=M.holes.map(h=>({...h,tide:10,pulse:0}));
   if(window.Fx) Fx.reset();
   startMusic();
   selectedBuild=null; selectedTower=null; speed=1; paused=false; rallySetFor=null;
   if($('pausebtn')) $('pausebtn').textContent=t('pause');
   hideOverlays(); closeBuildMenu(); buildTowerList(); refreshHUD(); updateWaveBtn(); renderSel();
   if(M.fork && !M.endless) flash(t('forkBonus').replace('{n}',FORK_BONUS_GOLD));
+  // 第一次遇到虫洞 / 黑洞：弹出介绍卡
+  for(const [k,has] of [['wormhole',M.worms.length],['blackhole',M.holes.length]]) if(has) triggerIntroIfNew('phen:'+k);
 }
 // 把一波的敌人按相对节奏排入「绝对时间表」spawnList
 function scheduleWave(waveIdx){
@@ -1681,6 +1661,7 @@ function launchWave(early){
 }
 function endGame(win){
   G.phase='done'; G.running=false; sfx(win?'win':'lose');
+  setTimeout(startMusic, 2500);                        // 胜负音效放完后回到主菜单曲
   const M=G.M;
   // 无限模式：另算分（记录最佳波数）
   const EN=LANG==='en';
@@ -1717,7 +1698,9 @@ function endGame(win){
 let last=performance.now();
 function loop(now){ let dt=(now-last)/1000; last=now; dt=Math.min(dt,0.05);
   if(G&&G.running&&!paused&&G.phase!=='done'){ for(let s=0;s<speed;s++) step(dt); }
-  draw(); updateSelLive(); refreshBuildMenu(); requestAnimationFrame(loop); }
+  draw(); updateSelLive(); refreshBuildMenu();
+  if(window.Music) Music.setIntensity(musicIntensity());
+  requestAnimationFrame(loop); }
 // 建造菜单随金币变化实时刷新「可建/不可建」
 function refreshBuildMenu(){
   const el=$('buildMenu'); if(!el||!el.classList.contains('on')||!G) return;
@@ -1744,6 +1727,18 @@ function updateSelLive(){
     if(btn&&btn.parentElement) btn.parentElement.title=t('repair')+' ('+Math.ceil((S.wpMax-tw.wp)*S.repair)+' '+t('gold')+')';
   }
 }
+// 虫洞按周期开关；黑洞定时引力潮汐：把膨胀圈里的敌人沿路往回拖
+const TIDE_EVERY=16;
+function updatePhenomena(dt){
+  for(const w of G.worms){ const open=G.started && ((G.clock+w.phase)%w.cycle)<w.open;
+    if(open!==w.isOpen){ w.isOpen=open; sfx(open?'wormOpen':'wormClose',{x:w.ax}); } }
+  for(const h of G.holes){ if(h.pulse>0) h.pulse=Math.max(0,h.pulse-dt);
+    if(!G.started) continue;
+    h.tide-=dt; if(h.tide>0) continue;
+    h.tide=TIDE_EVERY; h.pulse=1.2; sfx('tide',{x:h.x}); if(window.Fx) Fx.shake(2.5);
+    for(const e of G.enemies){ if(e.dead||e.leaked||e.x===undefined) continue;
+      const d=dist(e.x,e.y,h.x,h.y); if(d<h.r) e.dist=Math.max(0,e.dist-(14+40*(1-d/h.r))); } }
+}
 function step(dt){
   if(G.started){ G.gold += mineIncomeOf(G.mines)*dt; G.clock += dt; }
   // 自动按时间间隔触发下一波（即使上一波没清完）
@@ -1762,8 +1757,9 @@ function step(dt){
   updateWaveBtn();
   for(const e of G.enemies){ if(e.dead||e.leaked) continue; e.update(dt);
     if(e.leaked){ if(e.blocker)e.blocker=null; G.lives--; flash(t('leak'));
-      sfx('leak'); if(window.Fx){ Fx.shake(4); Fx.screenFlash('255,40,40',0.35); }
+      sfx('leak'); G.hitBase=1; if(window.Fx){ Fx.shake(4); Fx.screenFlash('255,40,40',0.35); }
       if(G.lives<=0){ refreshHUD(); endGame(false); return; } } }
+  updatePhenomena(dt);
   if(G.pendingEnemies.length){ for(const e of G.pendingEnemies) G.enemies.push(e); G.pendingEnemies.length=0; }
   for(const t of G.towers) t.update(dt);
   for(const s of G.shots) s.update(dt);
@@ -1828,10 +1824,7 @@ function draw(){
   }
   }
   if(window.Fx) Fx.drawUnder(ctx);
-  const ep=G.path[G.path.length-1];
-  ctx.fillStyle='#ff6b6b'; ctx.beginPath(); ctx.arc(ep[0],ep[1],18,0,7); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('🏰',ep[0],ep[1]);
+  drawPhenomena(T);
   // 建造位
   for(const p of G.pads){
     if(p.tower) continue;
@@ -1853,6 +1846,8 @@ function draw(){
       ctx.arc(t.x,t.y,t.S.range,0,7); ctx.fill(); ctx.strokeStyle='rgba(245,196,81,.4)'; ctx.stroke(); }
     const empty = t.kind==='ammo' && t.ammo<=0;
     ctx.save(); ctx.translate(t.x,t.y);
+    if(t.dil<0.99){ ctx.strokeStyle='rgba(180,140,255,.75)'; ctx.lineWidth=1.5;
+      for(let i=0;i<12;i++){ const a=i*Math.PI/6+T*0.3; ctx.beginPath(); ctx.moveTo(Math.cos(a)*19,Math.sin(a)*19); ctx.lineTo(Math.cos(a)*22,Math.sin(a)*22); ctx.stroke(); } }
     towerArt(ctx,t.key,t.tier,14,t.def.color,empty,t.ang,t.kick);
     for(let i=0;i<t.tier;i++){ ctx.fillStyle='#f5c451'; ctx.strokeStyle='#0b0f15'; ctx.lineWidth=1;
       ctx.beginPath(); ctx.arc(-7+i*7,-22,2.6,0,7); ctx.fill(); ctx.stroke(); }
@@ -1907,6 +1902,99 @@ function draw(){
   ctx.fillStyle='#8ad6a0'; ctx.font='13px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
   ctx.fillText(t('mineHud').replace('{n}',G.mines).replace('{g}',mineIncomeOf(G.mines).toFixed(1)), 24, GH-28);
 }
+/* ---------- 入口裂隙、终点基地、虫洞、黑洞（每帧画；黑洞本体和道路在背景里） ---------- */
+function routeEnds(){
+  if(G._ends) return G._ends;
+  const starts=[], ends=[];
+  for(const r of G.routes){ const a=r[0], b=r[2]||r[1], z=r[r.length-1], y=r[r.length-3]||r[0];
+    if(!starts.some(q=>dist(q.x,q.y,a[0],a[1])<20)) starts.push({x:a[0],y:a[1],ang:Math.atan2(b[1]-a[1],b[0]-a[0])});
+    if(!ends.some(q=>dist(q.x,q.y,z[0],z[1])<20)) ends.push({x:z[0],y:z[1]}); }
+  return G._ends={starts,ends};
+}
+// 入口：空间裂隙，紫红色漩涡（敌人从这里涌出）
+function drawRift(x,y,ang,T){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(ang);
+  if(window.Fx){ ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.8+0.2*Math.sin(T*3); ctx.drawImage(Fx.glow('190,60,255'),-46,-46,92,92); ctx.globalAlpha=1; }
+  ctx.globalCompositeOperation='lighter';
+  for(let i=0;i<3;i++){ const a0=T*(2.2-i*0.4)+i*2.1;
+    ctx.strokeStyle=i===1?'rgba(255,120,220,.55)':'rgba(190,130,255,.6)'; ctx.lineWidth=3-i*0.7;
+    ctx.beginPath(); ctx.ellipse(0,0,9+i*6,22+i*7,0,a0,a0+4.3); ctx.stroke(); }
+  ctx.globalCompositeOperation='source-over';
+  ctx.fillStyle='#07010d'; ctx.beginPath(); ctx.ellipse(0,0,6,17,0,0,7); ctx.fill();
+  ctx.strokeStyle='rgba(255,200,255,.8)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.restore();
+}
+// 终点：猎人公会的前哨基地，护盾被击中时闪红
+function drawBase(x,y,T){
+  const hit=Math.max(0,G.hitBase||0);
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle='rgba(0,0,0,.45)'; ctx.beginPath(); ctx.ellipse(0,8,38,24,0,0,7); ctx.fill();
+  const gr=ctx.createLinearGradient(0,-30,0,30); gr.addColorStop(0,'#5d6b80'); gr.addColorStop(1,'#1b222d');
+  ctx.fillStyle=gr; ctx.strokeStyle='#0b0f15'; ctx.lineWidth=1.5; ctx.beginPath();
+  for(let i=0;i<6;i++){ const a=i*Math.PI/3+Math.PI/6; ctx[i?'lineTo':'moveTo'](Math.cos(a)*30,Math.sin(a)*30); }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#26303e'; ctx.beginPath(); ctx.arc(0,0,20,0,7); ctx.fill();
+  for(let i=0;i<6;i++){ const a=i*Math.PI/3; ctx.fillStyle=(Math.floor(T*2)+i)%3?'#7ad3ff':'#e9fbff';
+    ctx.beginPath(); ctx.arc(Math.cos(a)*25,Math.sin(a)*25,1.8,0,7); ctx.fill(); }
+  ctx.fillStyle='#cfd6df'; ctx.fillRect(-1.5,-26,3,20);                    // 旗杆
+  ctx.fillStyle='#f5c451'; ctx.beginPath(); ctx.moveTo(1.5,-26); ctx.lineTo(15,-22+Math.sin(T*4)*1.5); ctx.lineTo(1.5,-17); ctx.fill();
+  const sc=hit>0?'255,90,90':'120,220,255', sa=0.35+0.12*Math.sin(T*2.5)+hit*0.5;
+  const dg=ctx.createRadialGradient(0,-4,4,0,0,26); dg.addColorStop(0,`rgba(${sc},0)`); dg.addColorStop(0.75,`rgba(${sc},${sa*0.35})`); dg.addColorStop(1,`rgba(${sc},${sa})`);
+  ctx.fillStyle=dg; ctx.beginPath(); ctx.arc(0,0,26,0,7); ctx.fill();
+  ctx.strokeStyle=`rgba(${sc},${Math.min(1,sa+0.2)})`; ctx.lineWidth=1.2; ctx.stroke();
+  ctx.restore();
+}
+// 虫洞口：开启时是旋转的光涡并用流动虚线连向出口；关闭时是暗环 + 开启倒计时弧
+function drawWorm(w,T){
+  const m=((G.clock+w.phase)%w.cycle+w.cycle)%w.cycle;
+  if(w.isOpen){ const mx=(w.ax+w.bx)/2, my=(w.ay+w.by)/2, nx=-(w.by-w.ay), ny=w.bx-w.ax, L=Math.hypot(nx,ny)||1;
+    ctx.save(); ctx.setLineDash([5,9]); ctx.lineDashOffset=-T*40; ctx.strokeStyle='rgba(200,160,255,.45)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(w.ax,w.ay); ctx.quadraticCurveTo(mx+nx/L*60,my+ny/L*60,w.bx,w.by); ctx.stroke(); ctx.restore(); }
+  for(const [x,y,col,dir] of [[w.ax,w.ay,'190,110,255',1],[w.bx,w.by,'110,210,255',-1]]){
+    ctx.save(); ctx.translate(x,y);
+    ctx.fillStyle='rgba(5,2,14,.85)'; ctx.beginPath(); ctx.arc(0,0,17,0,7); ctx.fill();
+    if(w.isOpen){
+      ctx.globalCompositeOperation='lighter';
+      if(window.Fx) ctx.drawImage(Fx.glow(col),-34,-34,68,68);
+      ctx.rotate(T*3*dir);
+      for(let i=0;i<4;i++){ ctx.rotate(Math.PI/2); ctx.strokeStyle=`rgba(${col},.8)`; ctx.lineWidth=2.2;
+        ctx.beginPath(); for(let k=0;k<=12;k++){ const t=k/12, r=4+t*16, a=t*2.4; ctx[k?'lineTo':'moveTo'](Math.cos(a)*r,Math.sin(a)*r); } ctx.stroke(); }
+      ctx.globalCompositeOperation='source-over';
+      const left=(w.open-m)/w.open;                                // 剩余开启时间
+      ctx.rotate(-T*3*dir); ctx.strokeStyle='rgba(255,255,255,.7)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(0,0,21,-Math.PI/2,-Math.PI/2+left*6.283); ctx.stroke();
+    } else {
+      ctx.strokeStyle=`rgba(${col},.45)`; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,17,0,7); ctx.stroke();
+      if(G.started){ const k=(m-w.open)/(w.cycle-w.open);            // 距离下次开启
+        ctx.strokeStyle=`rgba(${col},.9)`; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,0,21,-Math.PI/2,-Math.PI/2+k*6.283); ctx.stroke(); }
+      ctx.fillStyle=`rgba(${col},.5)`; ctx.beginPath(); ctx.arc(0,0,3+Math.sin(T*4)*1,0,7); ctx.fill();
+    }
+    ctx.restore(); }
+}
+// 黑洞：时间膨胀圈（虚线）、绕转的碎屑、引力潮汐的收缩波
+function drawHole(h,T){
+  ctx.save();
+  const zg=ctx.createRadialGradient(h.x,h.y,h.r*0.3,h.x,h.y,h.r);
+  zg.addColorStop(0,'rgba(140,90,255,0)'); zg.addColorStop(0.85,'rgba(140,90,255,.07)'); zg.addColorStop(1,'rgba(160,110,255,.16)');
+  ctx.fillStyle=zg; ctx.beginPath(); ctx.arc(h.x,h.y,h.r,0,7); ctx.fill();
+  ctx.setLineDash([4,7]); ctx.lineDashOffset=T*6; ctx.strokeStyle='rgba(190,150,255,.55)'; ctx.lineWidth=1.8;
+  ctx.beginPath(); ctx.arc(h.x,h.y,h.r,0,7); ctx.stroke(); ctx.setLineDash([]);
+  for(let i=0;i<14;i++){ const r=34+((i*37)%100)/100*(h.r*0.8), a=T*(60/Math.pow(r,1.1))+i*2.39;
+    ctx.fillStyle=`rgba(255,${170+(i%3)*25},120,${0.35+0.3*(1-r/h.r)})`;
+    ctx.beginPath(); ctx.arc(h.x+Math.cos(a)*r,h.y+Math.sin(a)*r*0.55,1.3,0,7); ctx.fill(); }
+  if(h.pulse>0){ const k=h.pulse/1.2, r=30+(h.r-30)*k;
+    ctx.strokeStyle=`rgba(200,150,255,${0.7*k})`; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(h.x,h.y,r,0,7); ctx.stroke(); }
+  if(!G.bg){ ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(h.x,h.y,22,0,7); ctx.fill(); }   // 没有写实背景时补画视界
+  ctx.restore();
+}
+function drawPhenomena(T){
+  const E=routeEnds();
+  for(const h of G.holes) drawHole(h,T);
+  for(const w of G.worms) drawWorm(w,T);
+  for(const s of E.starts) drawRift(s.x+Math.cos(s.ang)*8,s.y+Math.sin(s.ang)*8,s.ang,T);
+  for(const e of E.ends) drawBase(e.x,e.y,T);
+  if(G.hitBase>0) G.hitBase=Math.max(0,G.hitBase-0.03);
+}
 // 子弹外观：弩箭 / 狙击曳光 / 法球 / 冰晶 / 抛物线炮弹 / 火球
 function drawShot(s){
   const a=Math.atan2(s.tgt.y-s.y,s.tgt.x-s.x), G2=window.Fx?Fx.glow:null;
@@ -1936,6 +2024,23 @@ function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w
 cv.style.touchAction='none';
 function toGame(e){ const b=cv.getBoundingClientRect();
   return { x:(e.clientX-b.left)*(GW/b.width), y:(e.clientY-b.top)*(GH/b.height) }; }
+let _tapTower=null, _tapAt=0;
+// 补满一座塔：弹药塔补弹药（钱不够就按能付的补），兵营修好武器
+function refillTower(tw){
+  const S=tw.S, EN=LANG==='en';
+  if(tw.kind==='ammo'){
+    const need=S.ammoMax-tw.ammo; if(need<=0){ flash(EN?'Ammo full':'弹药已满'); return; }
+    const can=Math.min(need,Math.floor(G.gold/S.ammoCost)); if(can<=0){ sfx('deny'); flash(EN?'Not enough credits':'金币不足'); return; }
+    tw.ammo+=can; G.gold-=can*S.ammoCost;
+  } else {
+    const need=S.wpMax-tw.wp; if(need<=0){ flash(EN?'Weapon intact':'武器完好'); return; }
+    const cost=Math.ceil(need*S.repair); if(G.gold<cost){ sfx('deny'); flash(EN?'Not enough credits':'金币不足'); return; }
+    tw.wp=S.wpMax; G.gold-=cost;
+  }
+  sfx('reload',{x:tw.x});
+  if(window.Fx) Fx.text(tw.x,tw.y-32,tw.kind==='ammo'?(EN?'+Ammo':'+弹药'):(EN?'Repaired':'已修好'),'150,230,140');
+  refreshHUD();
+}
 function handleTap(mx,my){
   if(!G||G.phase==='done') return;
   closeBuildMenu();
@@ -1948,7 +2053,10 @@ function handleTap(mx,my){
   const TOL=(typeof PLAT!=='undefined'?PLAT.tap:24);
   // 已建的塔优先（点它=升级面板）
   let pick=null,bt=TOL; for(const t of G.towers){ const d=dist(mx,my,t.x,t.y); if(d<bt){bt=d;pick=t;} }
-  if(pick){ selectedTower = pick===selectedTower ? null : pick; renderSel(); return; }
+  if(pick){ const now=performance.now();
+    if(pick===_tapTower && now-_tapAt<380){ _tapTower=null; refillTower(pick); selectedTower=pick; renderSel(); return; }  // 双击：补满
+    _tapTower=pick; _tapAt=now;
+    selectedTower = pick===selectedTower ? null : pick; renderSel(); return; }
   // 空建造位 → 在它旁边弹出建造菜单
   let np=null,bp=TOL; for(const p of G.pads){ if(p.tower)continue; const d=dist(mx,my,p.x,p.y); if(d<bp){bp=d;np=p;} }
   if(np){ selectedTower=null; renderSel(); openBuildMenu(np); return; }
@@ -2045,14 +2153,10 @@ function renderSel(){
         ${sellBtn}
       </div>`;
   }
+  if(tw.dil<0.99) body+=`<div class="stat" style="color:#c8b4ff">⏳ ${LANG==='en'?'Time dilation: fire rate':'时间膨胀：攻速'} −${Math.round((1-tw.dil)*100)}%</div>`;
   p.innerHTML=body; placePanel(p,tw);
-  const fNeed=()=>{ sfx('deny'); flash(LANG==='en'?'Not enough credits':'金币不足'); };
-  if($('bAmmo')) $('bAmmo').onclick=()=>{ const refill=S.ammoMax-tw.ammo; if(refill<=0){flash(LANG==='en'?'Ammo full':'弹药已满');return;}
-    const can=Math.min(refill,Math.floor(G.gold/S.ammoCost)); if(can<=0){fNeed();return;}
-    tw.ammo+=can; G.gold-=can*S.ammoCost; sfx('reload',{x:tw.x}); refreshHUD(); renderSel(); };
-  if($('bWp')) $('bWp').onclick=()=>{ const need=S.wpMax-tw.wp; if(need<=0){flash(LANG==='en'?'Weapon intact':'武器完好');return;}
-    const cost=Math.ceil(need*S.repair); if(G.gold<cost){fNeed();return;}
-    tw.wp=S.wpMax; G.gold-=cost; sfx('reload',{x:tw.x}); refreshHUD(); renderSel(); };
+  if($('bAmmo')) $('bAmmo').onclick=()=>{ refillTower(tw); renderSel(); };
+  if($('bWp')) $('bWp').onclick=()=>{ refillTower(tw); renderSel(); };
   if($('bRally')) $('bRally').onclick=()=>{ rallySetFor = rallySetFor===tw?null:tw;
     flash(rallySetFor?(LANG==='en'?'Tap a spot in range to place the rally point':'点地图上的位置放置集结点（范围内）'):(LANG==='en'?'Cancelled':'已取消')); renderSel(); };
   if($('bUp')) $('bUp').onclick=()=>{ if(tw.tier>=3)return; const c=tw.upCost();
@@ -2108,9 +2212,10 @@ function setPaused(p, silent){
   const was=paused; paused=!!p;
   $('pausebtn').textContent=paused?t('resume'):t('pause');
   if(!silent && was!==paused) sfx(paused?'pause':'resume');
+  if(window.Music) Music.duck(paused);
 }
 $('pausebtn').onclick=()=>{ setPaused(!paused); flash(paused?t('paused'):t('resumed')); };
-function backToMenu(){ if(G) G.running=false; setPaused(false,true); rallySetFor=null;
+function backToMenu(){ if(G) G.running=false; setPaused(false,true); rallySetFor=null; startMusic();
   selectedTower=null; closeBuildMenu(); renderSel(); hideOverlays(); $('ovMenu').style.display='flex'; }
 /* ---- 新敌人首次登场：暂停 + 介绍卡（按 PROG.seenEnemies 永久记录） ---- */
 let _introResume=false, _introQueue=[];
@@ -2128,6 +2233,14 @@ function showNextIntro(){
     _introResume=false; return;
   }
   const type=_introQueue.shift();
+  const head=document.querySelector('#ovIntro [data-i18n="introNew"]');
+  if(head) head.textContent=t(type.startsWith('phen:')?'introPhen':'introNew');
+  if(type.startsWith('phen:')){ const k=type.slice(5), L=phenLore(k);
+    $('introName').textContent='✦ '+L.name; $('introText').textContent=L.intro+' '+L.habits;
+    const c=$('introArt'), g=c.getContext('2d'); g.clearRect(0,0,c.width,c.height);
+    g.save(); g.translate(c.width/2,c.height/2); phenArt(g,k,40); g.restore();
+    if(!paused){ setPaused(true,true); _introResume=true; }
+    $('ovIntro').style.display='flex'; return; }
   const e=ENEMIES[type], lore=codexLore('enemy',type);
   $('introName').textContent='⚠ '+nmEnemy(type);
   $('introText').textContent=lore.intro || '';
@@ -2178,72 +2291,22 @@ $('sAdmin').onclick=()=>{
             : (LANG==='en'?'🔓 Admin mode — all missions unlocked':'🔓 管理员模式：已解锁全部关卡'));
   syncAdminBtn(); };
 
-/* ---------- 背景音乐（程序生成，无需外部文件） ---------- */
-let AC=null, musicTimer=null, _mbus=null, _mdrone=null;
+/* ---------- 背景音乐（程序生成，曲目在 fx/music.js） ---------- */
+let AC=null;
 let musicOn = (localStorage.getItem('oredef_music')==='on');   // 默认静音，且记住选择
+// 当前该放哪首：关卡中按世界主题，其余界面放主菜单曲
+function musicMood(){ return (G && G.running && G.phase!=='done') ? themeFor(G.mi) : 'menu'; }
 function startMusic(){
-  if(!musicOn) return;
-  if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; } }
-  if(AC.state==='suspended') AC.resume();
-  if(musicTimer) return;
-  // 古老·刺激的部落战鼓（全程程序生成，离线可用）
-  if(_mbus){ try{_mbus.disconnect();}catch(e){} }
-  if(_mdrone){ try{_mdrone.o.stop();}catch(e){} _mdrone=null; }
-  const bus=AC.createGain(); bus.gain.value=0.30; bus.connect(AC.destination); _mbus=bus;
-  // 白噪声缓冲（鼓皮 / 沙锤）
-  const nb=AC.createBuffer(1,AC.sampleRate*0.5,AC.sampleRate);
-  { const d=nb.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; }
-  function noise(dur,g,hp,lp){ const s=AC.createBufferSource(); s.buffer=nb;
-    const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=(hp+lp)/2; bp.Q.value=0.7;
-    const ga=AC.createGain(); s.connect(bp); bp.connect(ga); ga.connect(bus);
-    const t=AC.currentTime; ga.gain.setValueAtTime(g,t); ga.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    s.start(t); s.stop(t+dur+0.02); }
-  // 战鼓 / 大鼓：膜鼓音（正弦 + 急速降调）
-  function drum(f0,f1,dur,g){ const o=AC.createOscillator(), ga=AC.createGain();
-    o.type='sine'; o.connect(ga); ga.connect(bus); const t=AC.currentTime;
-    o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+dur*0.7);
-    ga.gain.setValueAtTime(g,t); ga.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    o.start(t); o.stop(t+dur+0.03);
-    noise(0.05,g*0.35,400,2200); }                       // 鼓皮敲击瞬态
-  // 低吟号角 / 古老吟唱（锯齿 + 颤音）
-  function horn(freq,dur,g){ const o=AC.createOscillator(), ga=AC.createGain(),
-    lf=AC.createOscillator(), lg=AC.createGain();
-    o.type='sawtooth'; o.frequency.value=freq; lf.type='sine'; lf.frequency.value=5.5;
-    lg.gain.value=freq*0.012; lf.connect(lg); lg.connect(o.frequency);
-    const fl=AC.createBiquadFilter(); fl.type='lowpass'; fl.frequency.value=900;
-    o.connect(fl); fl.connect(ga); ga.connect(bus); const t=AC.currentTime;
-    ga.gain.setValueAtTime(0.0001,t); ga.gain.linearRampToValueAtTime(g,t+0.08);
-    ga.gain.setValueAtTime(g,t+dur*0.6); ga.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    o.start(t); lf.start(t); o.stop(t+dur+0.05); lf.stop(t+dur+0.05); }
-  // 低音持续 drone（远古氛围）
-  let drone=null;
-  function setDrone(freq){ if(drone){ try{drone.o.stop();}catch(e){} }
-    const o=AC.createOscillator(), ga=AC.createGain(), fl=AC.createBiquadFilter();
-    o.type='triangle'; o.frequency.value=freq; fl.type='lowpass'; fl.frequency.value=320;
-    o.connect(fl); fl.connect(ga); ga.connect(bus);
-    ga.gain.setValueAtTime(0.0001,AC.currentTime); ga.gain.linearRampToValueAtTime(0.10,AC.currentTime+0.6);
-    o.start(); drone={o,ga}; _mdrone=drone; }
-  // 弗里几亚调式（古老/紧张感）低音根音循环
-  const phr=[0,1,3,5,7,8,10], roots=[55,55,49,58], BIG=[0,3,6,8,11,14], MID=[4,12], SKIN=[2,5,7,10,13];
-  let step=0;
-  function tick(){
-    const s=step%16, bar=Math.floor(step/16);
-    if(s===0) setDrone(roots[bar%roots.length]);                 // 每小节换 drone 根音
-    if(BIG.indexOf(s)>=0) drum(150,52,0.30,0.95);                // 大战鼓（驱动）
-    if(MID.indexOf(s)>=0) drum(230,120,0.18,0.6);                // 中鼓
-    if(SKIN.indexOf(s)>=0) noise(0.09,0.5,300,1500);             // 手鼓皮
-    noise(0.03, s%2?0.10:0.20, 5000,9000);                       // 沙锤：步步不停 → 刺激
-    if(bar%2===1 && s===0){ const r=roots[bar%roots.length];     // 每两小节一句古老号角
-      horn(r*Math.pow(2,phr[(Math.random()*phr.length)|0]/12), 1.5, 0.16); }
-    if(bar%4===3 && s>=12){ drum(260-( s-12)*20,90,0.14,0.55); noise(0.05,0.3,300,1600); } // 收尾鼓花
-    step++;
-  }
-  tick(); musicTimer=setInterval(tick,140);                      // ~ 紧凑战鼓节奏
+  if(!musicOn || !window.Music) return;
+  const ac=ensureAC(); if(!ac) return;
+  Music.start(ac, musicMood());
 }
-function stopMusic(){ if(musicTimer){ clearInterval(musicTimer); musicTimer=null; }
-  if(_mdrone){ try{_mdrone.o.stop();}catch(e){} _mdrone=null; }
-  if(_mbus){ try{_mbus.disconnect();}catch(e){} _mbus=null; }
-  if(AC && AC.state==='running'){ try{ AC.suspend(); }catch(e){} } }
+function stopMusic(){ if(window.Music) Music.stop(); }
+// 音乐强度：备战 0，场上有敌人 1，Boss 在场 2
+function musicIntensity(){
+  if(!G || !G.running || G.phase==='done' || !G.enemies.length) return 0;
+  return G.enemies.some(e=>e.type.startsWith('boss')) ? 2 : 1;
+}
 /* 音乐开关已并入「设置」面板，按钮在 #setMusic */
 /* ---------- 音效（程序生成，独立于音乐开关） ---------- */
 let sfxOn = (localStorage.getItem('sh_sfx')!=='off');   // 默认开
@@ -2275,11 +2338,47 @@ function showCodex(){
     const title=`${[1,2,3].map(i=>nmTower(k,i)).join(' / ')}`;
     add('tw', title, t('towerBuilding'), lore.intro,
       g=>towerArt(g,k,1,15,tw.color,false), ()=>showCharDetail('tower',k)); }
+  for(const k of Object.keys(PHENOMENA)){ const L=phenLore(k);
+    add('ph', L.name, LANG==='en'?'Space phenomenon':'宇宙星象', L.intro, g=>phenArt(g,k,15), ()=>showCharDetail('phen',k)); }
   for(const k of Object.keys(ENEMIES)){ const e=ENEMIES[k];
     const lore=codexLore('enemy',k);
     add('en', nmEnemy(k), t('enemyUnit'), lore.intro,
       g=>enemyArt(g,{type:k,r:Math.min(16,e.r),def:e}), ()=>showCharDetail('enemy',k)); }
   hideOverlays(); $('ovCodex').style.display='flex';
+}
+/* ---------- 星象：虫洞、黑洞（图鉴条目 + 首次登场介绍卡） ---------- */
+const PHENOMENA={
+  wormhole:{ zh:{ name:'虫洞', intro:'时开时合的空间捷径。开启时，走进入口的虫群会瞬间出现在出口，跳过半条防线。',
+      origin:'虚空裂隙里被撕开的时空隧道。公会的星图标出了每一对入口和出口，但没人知道它们为何按节律开合。',
+      habits:'入口是紫色漩涡，出口是蓝色漩涡。关闭时外圈的进度弧显示离下次开启还有多久；开启时会有流动的虚线连到出口。',
+      traits:['按固定周期开启、关闭','开启时敌人从入口直接跳到出口','出口附近是最危险的位置，也是最好的伏击点','有的虫洞会把敌人甩到另一条路线上'] },
+    en:{ name:'Wormhole', intro:'A space shortcut that opens and closes. While open, swarm entering the mouth reappears at the exit, skipping half the defence.',
+      origin:'A spacetime tunnel torn open in the Void Rift. The Guild charts every pair of mouths, yet no one knows why they pulse open and shut.',
+      habits:'The entry is a violet vortex, the exit a blue one. Closed, the outer arc shows time until it opens; open, a flowing dashed line links to the exit.',
+      traits:['Opens and closes on a fixed cycle','Open: enemies jump from entry to exit','The exit is the most dangerous spot, and the best ambush','Some wormholes fling enemies onto another lane'] } },
+  blackhole:{ zh:{ name:'黑洞', intro:'靠近黑洞，时间会变慢：虫群走得慢，炮塔也打得慢。它还会定时掀起引力潮汐，把虫群往回拖。',
+      origin:'黑洞边境的引力深渊，连光都逃不出去。虫群借它的阴影潜行，猎人则学会了利用它扭曲的时间。',
+      habits:'虚线圆圈是时间膨胀区。圈里的敌人最多慢一半；圈里的塔最多慢三分之一（塔身周围会出现紫色时钟刻度）。每 16 秒一次引力潮汐，把圈里的敌人沿路往回拖。',
+      traits:['膨胀区内敌人减速（越靠近越慢，最多 −50%）','膨胀区内的塔攻速下降（最多 −35%）','每 16 秒引力潮汐，把圈内敌人往回拖','圈外的远程塔打圈里的慢速敌人最划算'] },
+    en:{ name:'Black Hole', intro:'Near a black hole, time slows: the swarm crawls, and so do your towers. It also raises gravity tides that drag the swarm back.',
+      origin:'The gravity abyss of the Black Hole Frontier, where not even light escapes. The swarm creeps in its shadow; hunters have learned to use its warped time.',
+      habits:'The dashed circle is the time-dilation zone. Enemies inside slow by up to half; towers inside fire up to a third slower (a violet clock ring marks them). Every 16 s a gravity tide drags enemies in the zone back along the road.',
+      traits:['Enemies in the zone slow down (up to −50% near the core)','Towers in the zone fire slower (up to −35%)','Gravity tide every 16 s drags enemies back','Long-range towers outside the zone get the best of both'] } },
+};
+function phenLore(k){ const p=PHENOMENA[k]; return LANG==='en'?p.en:p.zh; }
+// 星象图标（图鉴/介绍卡）
+function phenArt(g,k,R){
+  const T=performance.now()/1000;
+  if(k==='wormhole'){ g.fillStyle='#07010d'; g.beginPath(); g.arc(0,0,R,0,7); g.fill();
+    g.globalCompositeOperation='lighter'; if(window.Fx) g.drawImage(Fx.glow('190,110,255'),-R*1.8,-R*1.8,R*3.6,R*3.6);
+    for(let i=0;i<4;i++){ g.rotate(Math.PI/2); g.strokeStyle='rgba(200,140,255,.9)'; g.lineWidth=R*0.12;
+      g.beginPath(); for(let k2=0;k2<=12;k2++){ const t=k2/12, r=R*0.2+t*R*0.85, a=t*2.4; g[k2?'lineTo':'moveTo'](Math.cos(a)*r,Math.sin(a)*r); } g.stroke(); }
+    g.globalCompositeOperation='source-over'; return; }
+  g.save(); g.globalCompositeOperation='lighter';
+  for(const [sy,r0,r1,a] of [[0.9,1.05,2.1,0.9],[0.12,1.3,3.4,1]]){ g.save(); g.scale(1,sy);
+    const gr=g.createRadialGradient(0,0,R*0.4*r0,0,0,R*0.4*r1); gr.addColorStop(0,`rgba(255,240,210,${a})`); gr.addColorStop(0.3,`rgba(255,170,80,${a*0.6})`); gr.addColorStop(1,'rgba(200,60,20,0)');
+    g.fillStyle=gr; g.beginPath(); g.arc(0,0,R*0.4*r1,0,7); g.fill(); g.restore(); }
+  g.restore(); g.fillStyle='#000'; g.beginPath(); g.arc(0,0,R*0.42,0,7); g.fill();
 }
 function codexLore(kind,key){
   const src = (LANG==='en' && typeof CODEX_EN!=='undefined') ? CODEX_EN : CODEX;
@@ -2290,10 +2389,17 @@ function codexLore(kind,key){
 }
 function showCharDetail(kind,key){
   const el=$('codexBody'); el.style.display='block'; el.innerHTML='';
-  const det=document.createElement('div'); det.className='cdxDet '+(kind==='tower'?'tw':'en');
+  const det=document.createElement('div'); det.className='cdxDet '+(kind==='tower'?'tw':kind==='phen'?'ph':'en');
   let icon,nm,role,lore,statsHTML;
   const EN=LANG==='en';
-  if(kind==='tower'){
+  if(kind==='phen'){
+    lore=phenLore(key); nm=lore.name; role=EN?'Space phenomenon':'宇宙星象';
+    icon=`<canvas width="64" height="64"></canvas>`;
+    const rows = key==='wormhole'
+      ? [[EN?'First seen':'首次出现', EN?'Mission 11 · Void Rift':'第 11 关 · 虚空裂隙'],[EN?'Cycle':'开合周期', EN?'about 18 to 24 s, open 5 to 6 s':'约 18 到 24 秒一轮，每次开 5 到 6 秒'],[EN?'Effect':'效果', EN?'Teleports enemies entry → exit':'敌人从入口瞬移到出口']]
+      : [[EN?'First seen':'首次出现', EN?'Mission 15 · Black Hole Frontier':'第 15 关 · 黑洞边境'],[EN?'Enemy speed':'敌人速度', EN?'up to −50%':'最多 −50%'],[EN?'Tower fire rate':'塔攻速', EN?'up to −35%':'最多 −35%'],[EN?'Gravity tide':'引力潮汐', EN?'every 16 s, drags enemies back':'每 16 秒，把敌人往回拖']];
+    statsHTML=`<table><tbody>`+rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')+`</tbody></table>`;
+  } else if(kind==='tower'){
     const tw=TOWERS[key]; lore=codexLore('tower',key);
     nm = [1,2,3].map(i=>nmTower(key,i)).join(' / '); role = t('role3');
     icon=`<canvas width="64" height="64"></canvas>`;
@@ -2344,7 +2450,8 @@ function showCharDetail(kind,key){
   el.appendChild(det);
   // 画图标
   const c=det.querySelector('.head canvas'), g=c.getContext('2d'); g.translate(32,32);
-  if(kind==='tower') towerArt(g, key, 3, 22, TOWERS[key].color, false);
+  if(kind==='phen') phenArt(g, key, 22);
+  else if(kind==='tower') towerArt(g, key, 3, 22, TOWERS[key].color, false);
   else { const e=ENEMIES[key]; enemyArt(g,{type:key,r:Math.min(22,e.r+4),def:e}); }
   $('cdxToList').onclick=showCodex;
 }

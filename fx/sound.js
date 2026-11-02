@@ -9,13 +9,13 @@ const MAX_VOICES=26, last={};
 // 最短间隔（秒）：高频音效限流
 const GAP={ arrow:.05, longbow:.06, sniper:.08, magic:.06, arcane:.06, frost:.07, cannon:.08, heavy:.09, flame:.1,
   boom:.07, fireboom:.09, hitArrow:.07, hitMagic:.07, hitFrost:.08, clink:.09, clash:.08, zap:.08, die:.04,
-  deploy:.15, reload:.1 };
+  deploy:.15, reload:.1, warp:.08 };
 // 每种音效的总音量：按实测响度（最响 100ms 的 RMS）校准。开火声约 -29 dB，命中声更轻约 -35 dB，
 // 建造/升级约 -25 dB，波次号角/胜负/Boss 死亡最响约 -18 dB
 const VOL={ arrow:.9, longbow:.44, sniper:.61, magic:.39, arcane:.4, frost:.4, cannon:.38, heavy:.32, flame:.63,
   boom:.46, fireboom:.46, hitArrow:2.19, hitMagic:.81, hitFrost:1.05, clink:1.12, clash:2.06, zap:1.5, die:.58, bossDie:.55,
   deploy:.38, build:.46, upgrade:.43, perk:.3, sell:.86, deny:.38, reload:1.71, leak:1.04, wave:.41, win:.54, lose:1,
-  pause:.24, resume:.56 };
+  pause:.24, resume:.56, warp:.5, wormOpen:.45, wormClose:.4, tide:.7 };
 
 function setup(ctx){
   if(ac===ctx) return; ac=ctx;
@@ -94,6 +94,11 @@ const R={
   sell(o,t){ notes(o,t,'square',[1318,1760],.06,.12,.18,{lp:6000}); notes(o,t+.13,'square',[1318,1760],.06,.12,.12,{lp:6000}); },
   deny(o,t){ tone(o,t,'square',140,140,.15,.3,{lp:900}); tone(o,t+.1,'square',110,110,.18,.3,{lp:900}); },
   reload(o,t){ hiss(o,t,'bandpass',1500,1500,.03,.6,3); hiss(o,t+.08,'bandpass',2200,2200,.03,.6,3); tone(o,t+.08,'square',600,600,.03,.1); },
+  /* ---- 虫洞 / 黑洞 ---- */
+  warp(o,t,r){ tone(o,t,'sine',900*r,180,.18,.45,{vib:[40,60]}); tone(o,t+.12,'sine',200*r,1100*r,.16,.35); hiss(o,t,'bandpass',3000,600,.25,.25,2); },
+  wormOpen(o,t){ tone(o,t,'sine',220,880,.6,.35,{vib:[7,15],attack:.15}); tone(o,t,'triangle',330,1320,.6,.18,{attack:.15}); hiss(o,t,'highpass',4000,8000,.5,.1); },
+  wormClose(o,t){ tone(o,t,'sine',700,180,.45,.3,{attack:.03}); },
+  tide(o,t){ tone(o,t,'sine',90,38,1.1,.9,{attack:.2,vib:[3,6]}); hiss(o,t,'lowpass',500,90,1.1,.5); tone(o,t+.1,'sawtooth',70,40,.9,.15,{lp:300}); },
   /* ---- 战局 ---- */
   leak(o,t){ for(const d of [0,.2]) tone(o,t+d,'sawtooth',660,440,.18,.35,{lp:1800}); },
   wave(o,t){ tone(o,t,'sine',90,40,.35,.8); tone(o,t,'sawtooth',110,147,.9,.35,{attack:.05,glide:.2,hold:.4,lp:700});
@@ -105,7 +110,7 @@ const R={
   resume(o,t){ tone(o,t,'triangle',280,820,.18,.9); },
 };
 // 每种音效大约持续多久（用于通道计数）
-const DUR={ bossDie:1.6, wave:1, win:1.2, lose:1.5, perk:.6, upgrade:.45, build:.55, sniper:.45, leak:.4 };
+const DUR={ tide:1.2, wormOpen:.7, bossDie:1.6, wave:1, win:1.2, lose:1.5, perk:.6, upgrade:.45, build:.55, sniper:.45, leak:.4 };
 
 function play(ctx,kind,o){
   const fn=R[kind]; if(!fn) return;

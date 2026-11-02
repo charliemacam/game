@@ -1,8 +1,9 @@
 /* 关卡背景：程序生成的写实太空场景（每关开局渲染一次并缓存）
- * Backdrop.render({theme, seed, routes, W, H, res}) → { canvas, twinkles }
+ * Backdrop.render({theme, seed, routes, pads, holes, W, H, res}) → { canvas, twinkles }
+ *   pads / holes：塔位和黑洞位置（地形要托住塔位；黑洞画在玩法位置，并在地形上挖开）
  *   theme: 'earth' | 'space' | 'hell'；variant 0/1 选同一主题下的两种场景（不传则按 seed 随机）
  *   twinkles: 需要每帧闪烁的远处亮星 {x,y,r,c,ph,sp}
- * 画面元素：银河带 + 星云 + 多层星空 + 主题天体（行星/环/黑洞/恒星）+ 岩石栈道 + 暗角
+ * 画面元素：银河带 + 星云 + 多层星空 + 主题天体（行星/环/黑洞/恒星）+ 浮空岩地 + 道路（含立交桥）+ 暗角
  */
 (function(){
 function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a);
@@ -45,11 +46,14 @@ function pickSpot(cands,routes){ let best=cands[0], bd=-1;
 
 const THEMES={
   earth:{ base:['#02060b','#061420','#020509'], neb:[[30,120,140],[70,60,150],[20,70,90]], dust:0.55,
-          road:{ edge:'#15130f', base:'#4a4236', wear:'#6a5f4c' } },
+          road:{ edge:'#15130f', base:'#6b5a40', wear:'#8a7656', style:'dirt' },
+          land:{ top:[[62,66,56],[96,98,80]], moss:[70,104,58], cliff:[[48,42,34],[16,14,11]], crystal:[110,230,255] } },
   space:{ base:['#04030c','#0b0922','#03020a'], neb:[[110,55,190],[210,70,140],[40,80,190]], dust:0.65,
-          road:{ edge:'#121318', base:'#3f444f', wear:'#5d6472' } },
+          road:{ edge:'#0f1116', base:'#3a4352', wear:'#56627a', style:'metal' },
+          land:{ top:[[66,62,64],[100,94,92]], moss:[86,80,112], cliff:[[44,40,46],[14,12,16]], crystal:[190,140,255] } },
   hell: { base:['#0a0203','#1a0508','#050102'], neb:[[190,50,20],[110,10,35],[240,120,40]], dust:0.75,
-          road:{ edge:'#120807', base:'#3b2622', wear:'#58372c' } },
+          road:{ edge:'#120807', base:'#4a2c24', wear:'#6a4234', style:'basalt' },
+          land:{ top:[[40,30,28],[70,52,46]], moss:[90,40,24], cliff:[[42,22,18],[12,6,5]], crystal:[255,140,60] } },
 };
 
 /* ---------- 星空、银河、星云 ---------- */
@@ -265,12 +269,83 @@ function asteroids(g,W,H,R,N,routes,n,light,col){
   }
 }
 
-/* ---------- 道路：岩石栈道 + 路面纹理 ---------- */
+/* ---------- 地形：托着道路和塔位的浮空岩地（悬崖、陨坑、碎石、晶体） ---------- */
+function plen(p){ let L=0; for(let i=1;i<p.length;i++) L+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); return L; }
+// 沿折线每隔 step 取一个点（含切线方向）
+function walk(p,step,fn){ let acc=0;
+  for(let i=1;i<p.length;i++){ const ax=p[i-1][0], ay=p[i-1][1], dx=p[i][0]-ax, dy=p[i][1]-ay, L=Math.hypot(dx,dy); if(!L) continue;
+    let t=(step-acc)/L; while(t<=1){ fn(ax+dx*t, ay+dy*t, dx/L, dy/L); t+=step/L; } acc=(acc+L)%step; } }
+function tint(mask,col){ const c=document.createElement('canvas'); c.width=mask.width; c.height=mask.height;
+  const x=c.getContext('2d'); x.drawImage(mask,0,0); x.globalCompositeOperation='source-in'; x.fillStyle=col; x.fillRect(0,0,c.width,c.height); return c; }
+function terrain(g,W,H,res,routes,pads,holes,T,N,R){
+  const S=T.land, m=document.createElement('canvas'); m.width=W*res; m.height=H*res;
+  const mg=m.getContext('2d'); mg.scale(res,res); mg.fillStyle='#fff';
+  const blob=(x,y,r)=>{ mg.beginPath(); mg.arc(x,y,r,0,7); mg.fill(); };
+  for(const p of routes) walk(p,10,(x,y)=>blob(x,y,44+46*N.fbm(x/110,y/110,3.3,3)+7*N.n3(x/16,y/16,0.5)));
+  for(const q of pads) blob(q.x,q.y,36+10*N.n3(q.x/40,q.y/40,1.1));
+  for(let i=0;i<7;i++){ const x=R()*W, y=R()*H; if(routeDist(x,y,routes)<120) continue;   // 远处零散的小浮岩
+    for(let k=0;k<4;k++) blob(x+(R()-0.5)*30,y+(R()-0.5)*20,8+R()*14); }
+  mg.globalCompositeOperation='destination-out';
+  for(const h of holes){ const gr=mg.createRadialGradient(h.x,h.y,30,h.x,h.y,62); gr.addColorStop(0,'#000'); gr.addColorStop(1,'rgba(0,0,0,0)');
+    mg.fillStyle=gr; mg.beginPath(); mg.arc(h.x,h.y,62,0,7); mg.fill(); }
+  // 悬崖：遮罩往下错开，竖直渐变上色，外加一圈投影
+  const cl=document.createElement('canvas'); cl.width=m.width; cl.height=m.height; const cg=cl.getContext('2d');
+  cg.drawImage(m,0,0); cg.globalCompositeOperation='source-in';
+  const cgr=cg.createLinearGradient(0,0,0,m.height); cgr.addColorStop(0,rgba(S.cliff[0],1)); cgr.addColorStop(1,rgba(S.cliff[1],1));
+  cg.fillStyle=cgr; cg.fillRect(0,0,m.width,m.height);
+  g.save(); g.shadowColor='rgba(0,0,0,.75)'; g.shadowBlur=26; g.shadowOffsetY=10;
+  g.drawImage(cl,0,14,W,H); g.restore();
+  g.drawImage(tint(m,'rgba(0,0,0,.35)'),0,7,W,H);                         // 悬崖上沿的暗带
+  // 地表：低分辨率逐像素噪声上色（岩石 + 苔藓/尘土斑块），再裁成遮罩形状
+  const s2=2, w=Math.ceil(W/s2), h=Math.ceil(H/s2), tc=document.createElement('canvas'); tc.width=w; tc.height=h;
+  const tx=tc.getContext('2d'), id=tx.createImageData(w,h), D=id.data;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const X=x*s2/70, Y=y*s2/70;
+    const n=N.fbm(X,Y,7.7,5), fine=N.n3(X*9,Y*9,2.2), moss=sstep(0.55,0.7,N.fbm(X*0.8+20,Y*0.8,4.4,4));
+    let c=mix(S.top[0],S.top[1],sstep(0.3,0.75,n)); c=mix(c,S.moss,moss*0.55);
+    const k=0.86+fine*0.22, i=(y*w+x)*4; D[i]=c[0]*k; D[i+1]=c[1]*k; D[i+2]=c[2]*k; D[i+3]=255; }
+  tx.putImageData(id,0,0);
+  const top=document.createElement('canvas'); top.width=m.width; top.height=m.height; const tg=top.getContext('2d');
+  tg.imageSmoothingQuality='high'; tg.drawImage(tc,0,0,m.width,m.height);
+  const gr2=document.createElement('canvas'); gr2.width=gr2.height=96; const gx=gr2.getContext('2d');   // 细颗粒
+  for(let i=0;i<1400;i++){ gx.fillStyle=R()<0.5?'rgba(0,0,0,.16)':'rgba(255,245,230,.09)'; gx.fillRect(R()*96,R()*96,1+R()*1.5,1+R()*1.5); }
+  tg.fillStyle=tg.createPattern(gr2,'repeat'); tg.fillRect(0,0,top.width,top.height);
+  tg.globalCompositeOperation='destination-in'; tg.drawImage(m,0,0);
+  g.drawImage(top,0,0,W,H);
+  // 上沿受光：遮罩减去下移 3px 的自身 → 一道亮边
+  const rim=document.createElement('canvas'); rim.width=m.width; rim.height=m.height; const rg=rim.getContext('2d');
+  rg.drawImage(m,0,0); rg.globalCompositeOperation='destination-out'; rg.drawImage(m,0,3*res);
+  rg.globalCompositeOperation='source-in'; rg.fillStyle='rgba(255,240,220,.22)'; rg.fillRect(0,0,rim.width,rim.height);
+  g.drawImage(rim,0,0,W,H);
+  // 装饰：只放在陆地上、离路和塔位都有距离的地方
+  const onLand=(x,y)=>{ if(x<4||y<4||x>W-4||y>H-4) return false; const d=mg.getImageData(x*res|0,y*res|0,1,1).data; return d[3]>200; };
+  const clear=(x,y,r)=>routeDist(x,y,routes)>34+r && !pads.some(q=>Math.hypot(q.x-x,q.y-y)<22+r);
+  for(let i=0;i<90;i++){ const x=R()*W, y=R()*H, r=3+Math.pow(R(),2)*14;          // 陨坑
+    if(!clear(x,y,r)||!onLand(x,y)) continue;
+    g.fillStyle='rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(x,y,r,r*0.75,0,0,7); g.fill();
+    g.strokeStyle='rgba(255,240,220,.16)'; g.lineWidth=1.2; g.beginPath(); g.ellipse(x,y,r,r*0.75,0,0.2,2.6); g.stroke();
+    g.strokeStyle='rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(x,y,r,r*0.75,0,3.3,5.8); g.stroke(); }
+  for(let i=0;i<160;i++){ const x=R()*W, y=R()*H, r=1.5+Math.pow(R(),3)*7;       // 碎石
+    if(!clear(x,y,r)||!onLand(x,y)) continue;
+    const pts=[]; for(let k=0;k<7;k++){ const a=k/7*6.283, rr=r*(0.7+R()*0.5); pts.push([x+Math.cos(a)*rr,y+Math.sin(a)*rr*0.8]); }
+    g.fillStyle='rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(x+1,y+r*0.6,r,r*0.4,0,0,7); g.fill();
+    const gr=g.createLinearGradient(x-r,y-r,x+r,y+r); gr.addColorStop(0,rgba(mix(S.top[1],[255,255,255],0.15),1)); gr.addColorStop(1,rgba(S.cliff[0],1));
+    g.fillStyle=gr; g.beginPath(); pts.forEach((q,k)=>g[k?'lineTo':'moveTo'](q[0],q[1])); g.closePath(); g.fill(); }
+  for(let i=0;i<26;i++){ const x=R()*W, y=R()*H;                                 // 晶体簇（主题色，微微发光）
+    if(!clear(x,y,8)||!onLand(x,y)) continue;
+    g.save(); g.globalCompositeOperation='lighter';
+    const gl=g.createRadialGradient(x,y-4,0,x,y-4,16); gl.addColorStop(0,rgba(S.crystal,0.35)); gl.addColorStop(1,rgba(S.crystal,0));
+    g.fillStyle=gl; g.fillRect(x-16,y-20,32,32); g.restore();
+    for(let k=0;k<3;k++){ const a=-1.57+(k-1)*0.45+(R()-0.5)*0.3, L=6+R()*7, bx=x+(k-1)*3;
+      g.fillStyle=rgba(mix(S.crystal,[255,255,255],0.35),0.95); g.beginPath();
+      g.moveTo(bx-2,y); g.lineTo(bx+Math.cos(a)*L,y+Math.sin(a)*L); g.lineTo(bx+2,y); g.closePath(); g.fill(); } }
+}
+
+/* ---------- 道路：路面纹理 + 主题细节（土路车辙/金属接缝/玄武岩熔岩缝） + 立交桥 ---------- */
 function roadPath(g,routes){ g.beginPath(); for(const p of routes){ g.moveTo(p[0][0],p[0][1]); for(let i=1;i<p.length;i++) g.lineTo(p[i][0],p[i][1]); } }
 function road(g,W,H,res,routes,T,N,R){
   const S=T.road;
   g.save(); g.lineJoin='round'; g.lineCap='round';
-  g.shadowColor='rgba(0,0,0,.8)'; g.shadowBlur=22; g.strokeStyle=S.edge; g.lineWidth=64; roadPath(g,routes); g.stroke();
+  g.shadowColor='rgba(0,0,0,.6)'; g.shadowBlur=10; g.strokeStyle=S.edge; g.lineWidth=60; roadPath(g,routes); g.stroke();
   g.restore();
   // 路面画在独立画布上，再用 source-atop 只给路面叠纹理
   const c=document.createElement('canvas'); c.width=W*res; c.height=H*res;
@@ -288,12 +363,69 @@ function road(g,W,H,res,routes,T,N,R){
     tg.fillStyle='rgba(255,255,255,.18)'; tg.beginPath(); tg.ellipse(x,y,s,s*0.8,0,0,7); tg.fill(); }
   r.fillStyle=r.createPattern(tile,'repeat'); r.fillRect(0,0,W,H);
   r.globalAlpha=0.35; r.strokeStyle=S.wear; r.lineWidth=20; roadPath(r,routes); r.stroke(); r.globalAlpha=1;
+  // 主题细节
+  for(const p of routes){
+    if(S.style==='dirt'){                                       // 两道车辙 + 路沿小石子
+      for(const o of [-11,11]) walk(p,5,(x,y,dx,dy)=>{ r.fillStyle='rgba(30,22,12,.22)'; r.fillRect(x-dy*o-1.2,y+dx*o-1.2,2.4,2.4); });
+      walk(p,7,(x,y,dx,dy)=>{ for(const sd of [-1,1]){ if(R()<0.5) continue; const o=sd*(22+R()*3);
+        r.fillStyle=R()<0.5?'rgba(255,240,210,.22)':'rgba(0,0,0,.25)'; r.beginPath(); r.arc(x-dy*o,y+dx*o,0.8+R()*1.3,0,7); r.fill(); } });
+    } else if(S.style==='metal'){                               // 横向接缝 + 两侧导轨 + 铆钉
+      walk(p,24,(x,y,dx,dy)=>{ r.strokeStyle='rgba(0,0,0,.35)'; r.lineWidth=1.2; r.beginPath(); r.moveTo(x-dy*24,y+dx*24); r.lineTo(x+dy*24,y-dx*24); r.stroke();
+        r.strokeStyle='rgba(255,255,255,.08)'; r.beginPath(); r.moveTo(x-dy*24+dx*1.3,y+dx*24+dy*1.3); r.lineTo(x+dy*24+dx*1.3,y-dx*24+dy*1.3); r.stroke();
+        for(const o of [-19,19]){ r.fillStyle='rgba(200,215,235,.35)'; r.beginPath(); r.arc(x-dy*o+dx*6,y+dx*o+dy*6,0.9,0,7); r.fill(); } });
+      for(const o of [-22,22]) walk(p,3,(x,y,dx,dy)=>{ r.fillStyle='rgba(150,170,200,.18)'; r.fillRect(x-dy*o-0.8,y+dx*o-0.8,1.6,1.6); });
+    } else {                                                    // 玄武岩：横穿路面的发光熔岩缝
+      walk(p,38,(x,y,dx,dy)=>{ if(R()<0.35) return; const o0=(R()-0.5)*30;
+        r.save(); r.globalCompositeOperation='lighter'; r.strokeStyle='rgba(255,110,30,.55)'; r.lineWidth=1.3; r.shadowColor='rgba(255,90,20,.9)'; r.shadowBlur=6;
+        r.beginPath(); let px=x-dy*(-24), py=y+dx*(-24); r.moveTo(px,py);
+        for(let k=1;k<=5;k++){ const o=-24+k*9.6, j=(R()-0.5)*7; r.lineTo(x-dy*o+dx*(j+o0*0.15),y+dx*o+dy*(j+o0*0.15)); }
+        r.stroke(); r.restore(); });
+    }
+  }
   g.drawImage(c,0,0,W,H);
+  // 立交桥：两段路交叉的地方，后画的那段架成桥（桥面 + 护栏 + 桥下阴影）
+  for(const b of crossings(routes)){
+    g.save(); g.translate(b.x,b.y); g.rotate(b.ang);
+    g.fillStyle='rgba(0,0,0,.45)'; g.filter='blur(4px)'; g.fillRect(-62,-26+9,124,60); g.filter='none';
+    const dk=g.createLinearGradient(0,-30,0,30); dk.addColorStop(0,'#5a6070'); dk.addColorStop(0.5,'#3c414d'); dk.addColorStop(1,'#2a2e37');
+    g.fillStyle=dk; g.fillRect(-60,-29,120,58);
+    g.strokeStyle='rgba(0,0,0,.35)'; g.lineWidth=1; for(let x=-56;x<=56;x+=8){ g.beginPath(); g.moveTo(x,-27); g.lineTo(x,27); g.stroke(); }
+    for(const sd of [-1,1]){ g.fillStyle='#1c1f26'; g.fillRect(-60,sd*29-(sd>0?4:0),120,4);
+      g.fillStyle='#8e98a8'; g.fillRect(-60,sd*31-1,120,2);
+      for(let x=-56;x<=56;x+=14){ g.fillStyle='#cfd6df'; g.fillRect(x-1,sd*31-2,2,4); } }
+    g.fillStyle='#22262e'; g.fillRect(-64,-31,6,62); g.fillRect(58,-31,6,62);
+    g.restore(); }
+}
+// 找出道路交叉点：不同路线（且该处没有并道）或同一路线相隔很远的两段
+function crossings(routes){
+  const out=[], segs=[];
+  routes.forEach((p,ri)=>{ let d=0; for(let i=1;i<p.length;i++){ const L=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); segs.push({ri,a:p[i-1],b:p[i],d}); d+=L; } });
+  const near=(p,x,y)=>{ let m=1e9; for(let i=1;i<p.length;i++){ const ax=p[i-1][0],ay=p[i-1][1],bx=p[i][0]-ax,by=p[i][1]-ay,L=bx*bx+by*by||1;
+    const t=clamp(((x-ax)*bx+(y-ay)*by)/L,0,1); m=Math.min(m,Math.hypot(x-ax-bx*t,y-ay-by*t)); } return m; };
+  // 路口判定：沿 B 往前或往后走 50~320 像素，如果又回到 A 上（相距 < 12），说明两条路在这里汇合或分岔，而不是交叉
+  const at=(p,d)=>{ for(let i=1;i<p.length;i++){ const L=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]); if(d<=L){ const t=L?d/L:0; return [p[i-1][0]+(p[i][0]-p[i-1][0])*t,p[i-1][1]+(p[i][1]-p[i-1][1])*t]; } d-=L; } return p[p.length-1]; };
+  const junction=(ra,rb,dB)=>{ const P=routes[rb], L=plen(P);
+    return [-320,-200,-90,-50,50,90,200,320].some(k=>{ const d=dB+k; if(d<0||d>L) return false; const q=at(P,d); return near(routes[ra],q[0],q[1])<12; }); };
+  for(let i=0;i<segs.length;i++) for(let j=i+1;j<segs.length;j++){
+    const A=segs[i], B=segs[j];
+    if(A.ri===B.ri && Math.abs(A.d-B.d)<150) continue;
+    const r=[A.b[0]-A.a[0],A.b[1]-A.a[1]], s2=[B.b[0]-B.a[0],B.b[1]-B.a[1]], den=r[0]*s2[1]-r[1]*s2[0];
+    if(Math.abs(den)<1e-6) continue;
+    const qp=[B.a[0]-A.a[0],B.a[1]-A.a[1]], t=(qp[0]*s2[1]-qp[1]*s2[0])/den, u=(qp[0]*r[1]-qp[1]*r[0])/den;
+    if(t<0||t>1||u<0||u>1) continue;
+    const x=A.a[0]+r[0]*t, y=A.a[1]+r[1]*t;
+    const cos=Math.abs((r[0]*s2[0]+r[1]*s2[1])/(Math.hypot(...r)*Math.hypot(...s2)));
+    if(cos>0.8) continue;                                       // 夹角太小：是并道/分岔，不是交叉
+    if(A.ri!==B.ri && junction(A.ri,B.ri,B.d+u*Math.hypot(...s2))) continue;   // 两条路线在这里汇合/分岔：是路口，不是立交
+    if(routes.some(p=>[p[0],p[p.length-1]].some(q=>Math.hypot(q[0]-x,q[1]-y)<50))) continue;   // 入口、终点处不架桥
+    if(out.some(o=>Math.hypot(o.x-x,o.y-y)<40)) continue;
+    out.push({x,y,ang:Math.atan2(s2[1],s2[0])}); }
+  return out;
 }
 
 /* ---------- 主入口 ---------- */
 function render(o){
-  const { W, H, res, routes } = o, theme=THEMES[o.theme]?o.theme:'space', T=THEMES[theme];
+  const { W, H, res, routes } = o, theme=THEMES[o.theme]?o.theme:'space', T=THEMES[theme], holes=o.holes||[], pads=o.pads||[];
   const R=mulberry(o.seed|0), N=makeNoise((o.seed|0)+7), variant=o.variant!=null ? o.variant%2 : (R()<0.5?0:1), twinkles=[];
   const cv=document.createElement('canvas'); cv.width=W*res; cv.height=H*res;
   const g=cv.getContext('2d'); g.scale(res,res);
@@ -338,7 +470,7 @@ function render(o){
       asteroids(g,W,H,R,N,routes,24,L,[[170,180,195],[45,50,60]]);
     }
   } else {
-    if(variant===0){                              // 黑洞 + 吸积盘
+    if(variant===0 && !holes.length){            // 黑洞 + 吸积盘（关卡自带黑洞时不再另画）
       const [bx,by]=pickSpot([[W*0.8,H*0.26],[W*0.2,H*0.26],[W*0.8,H*0.74],[W*0.2,H*0.74],[W*0.5,H*0.2]],routes);
       blackHole(g,bx,by,40+R()*8);
       asteroids(g,W,H,R,N,routes,20,L,[[120,70,50],[30,14,10]]);
@@ -350,6 +482,8 @@ function render(o){
       sphere(g,W,H,px,py,230,{ ...lavaTex(N), light:v.map(a=>a/m), atmo:[255,90,40], tilt:0.4 });
     }
   }
+  for(const h of holes) blackHole(g,h.x,h.y,22);            // 玩法黑洞：画在真实位置
+  terrain(g,W,H,res,routes,pads,holes,T,N,R);
   road(g,W,H,res,routes,T,N,R);
   gr=g.createRadialGradient(W/2,H/2,H*0.45,W/2,H/2,W*0.72);
   gr.addColorStop(0,'rgba(0,0,0,0)'); gr.addColorStop(1,'rgba(0,0,0,.55)');

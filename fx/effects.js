@@ -79,6 +79,14 @@ function hit(kind,x,y){
     add({x,y,life:.3,size:3,grow:70,col:'190,240,255',kind:'ring',a:.8});
     burst(x,y,7,{s0:40,s1:110,l0:.3,l1:.55,z0:2.5,z1:4,col:'210,245,255',kind:'shard',drag:3}); }
 }
+// 虫洞传送：入口紫光收缩，出口蓝光迸发
+function warp(ax,ay,bx,by){
+  add({x:ax,y:ay,life:.3,size:26,grow:-60,col:'200,120,255',kind:'ring',a:.9});
+  burst(ax,ay,6,{s0:20,s1:60,l0:.2,l1:.35,z0:2,z1:3,col:'200,140,255',kind:'glow',drag:3});
+  add({x:bx,y:by,life:.2,size:18,col:'140,220,255',kind:'glow'});
+  add({x:bx,y:by,life:.35,size:6,grow:70,col:'140,220,255',kind:'ring',a:.9});
+  burst(bx,by,8,{s0:50,s1:120,l0:.2,l1:.4,z0:1,z1:1.6,col:'180,235,255',kind:'spark',drag:3});
+}
 function clink(x,y){ burst(x,y,4,{s0:70,s1:150,l0:.1,l1:.2,z0:1,z1:1.4,col:'255,240,180',kind:'spark',drag:4}); }
 // 锯齿闪电（连锁 / 贯穿）
 function zap(x1,y1,x2,y2,col){
@@ -171,6 +179,6 @@ function draw(g,W,H){
 }
 function reset(){ P=[]; decals=[]; shake=0; ox=oy=0; flashA=0; }
 
-window.Fx={ glow, rgbOf, muzzle, trail, explosion, hit, clink, zap, burn, chill, death, build, upgrade, sell,
+window.Fx={ glow, rgbOf, muzzle, trail, explosion, hit, clink, zap, warp, burn, chill, death, build, upgrade, sell,
   text, shake:shakeBy, screenFlash, update, drawUnder, draw, reset, offset:()=>[ox,oy], count:()=>P.length };
 })();

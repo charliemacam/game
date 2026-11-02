@@ -414,15 +414,28 @@ const GW=960, GH=620;
 const RES=2;                     // 画布内部分辨率倍数（高清屏不发糊）
 cv.width=GW*RES; cv.height=GH*RES;
 const GOLD_PER_MINE=4;          // 每个矿每秒产出金币
-// 矿收益：前 5 个矿满额；第 6 个起每个产出指数衰减（÷2）
+/* ---- 难度曲线参数（用自动对局调过，见 DEV_WORKFLOW「平衡性」）---- */
+const START_MINES=3;            // 开局矿数（每通一关 +1，上限 9）
+const MINE_DECAY=0.75;          // 第 6 个矿起，每个矿的产出依次 ×0.75（原 ÷2，后期收入太平）
+const HP_GROWTH=0.08;           // 前 10 关每关敌人血量增幅（原 0.11）
+const HP_GROWTH_LATE=0.035;     // 第 11 关起每关增幅放缓（后期叠波压力已经很大）
+const EASE_FIRST=[0.75,0.83,0.91];  // 前 3 关的血量折扣（新手缓冲）
+const BOSS_ESCORT_MAX=36;       // Boss 波护卫总数上限
+const WAVE_MAX_UNITS=60;        // 普通波人数上限：超出则按比例减人、等比加血（整波总血量不变）
+const WAVE_SPAWN_MAX=20;        // 每波出兵要在这么多秒内出完（比波间隔短），避免多波叠在一起
+const FORK_BONUS_GOLD=100;      // 分叉地图开局额外金币（两路进攻，火力要分开布）
+const FORK_HP_EASE=0.01;        // 分叉地图敌人血量每关多打 1% 折（第 16 关约 85 折）：塔位与火力被两条路线拆开
+const DENSE_WAVE_HP=0.9;        // 被压缩的大波次总血量打九折：敌人到得更密集
+// 矿收益：前 5 个矿满额；第 6 个起每个产出指数衰减
 function mineIncomeOf(n){
   let s=0;
-  for(let i=1;i<=n;i++) s += (i<=5) ? GOLD_PER_MINE : GOLD_PER_MINE/Math.pow(2,i-5);
+  for(let i=1;i<=n;i++) s += (i<=5) ? GOLD_PER_MINE : GOLD_PER_MINE*Math.pow(MINE_DECAY,i-5);
   return s;
 }
 const AUTO_DELAY=14;            // (旧)上一波清除后倒计时——已被 WAVE_INTERVAL 取代
 const WAVE_INTERVAL=22;         // 每波之间的固定间隔（秒）——不等上一波清完就来
 const EARLY_REWARD_PER_SEC=5;   // 提前开始下一波：每节省 1 秒奖励金币
+const EARLY_LOCK=10;            // 每波开始后至少等这么多秒，才能再提前叫下一波（防止连点叠波刷金）
 const LEVELS=27;                // 主线 18 + 奖励 9（3 个系列 × 3 关）= 27 关
 const SMOOTH=true;              // 道路平滑（向心 Catmull-Rom）；false 回到直角折线
 const $=id=>document.getElementById(id);
@@ -449,6 +462,8 @@ const TXT = {
   sideHint:'<b>点路边的建造位</b>选建筑。点已建的塔可升级；满级买特性。塔弹药耗尽会停火；兵营士兵不耗弹药但武器会损耗。',
   mineHud:'⛏ 矿 × {n}   +{g} 金/秒', mineHdr:'（当前 {n} 矿 · +{g} 金/秒）',
   wave1:'▶ 开始第 1 波', waveEarly:'▶ 提前 第 {n} 波（{s}s · +{g}金）', waveDone:'全部波次已派出',
+  waveLocked:'⏳ 第 {n} 波 · {s}s 后可提前',
+  forkBonus:'分叉地图：开局金币 +{n}',
   win:'🏆 胜利！', lose:'💀 王国陷落',
   buildHere:'请点路边的建造位', needGold:'金币不足，需要 {n}',
   dmg:'伤害', range:'射程', ammo:'弹药', perShot:'单发', gold:'金',
@@ -482,6 +497,8 @@ const TXT = {
   sideHint:'<b>Tap a build pad</b> beside the route to pick a structure. Tap a built tower to upgrade; buy two perks at max tier. Towers stop firing when out of ammo; barracks troops use no ammo but their weapons wear down.',
   mineHud:'⛏ Rigs × {n}   +{g}/s', mineHdr:'(Rigs: {n} · +{g}/s)',
   wave1:'▶ Launch Wave 1', waveEarly:'▶ Send Wave {n} early ({s}s · +{g})', waveDone:'All waves launched',
+  waveLocked:'⏳ Wave {n} · call early in {s}s',
+  forkBonus:'Split route: +{n} starting credits',
   win:'🏆 Victory!', lose:'💀 The Kingdom Has Fallen',
   buildHere:'Tap a build pad beside the route', needGold:'Not enough credits — need {n}',
   dmg:'DMG', range:'Range', ammo:'Ammo', perShot:'per shot', gold:'cr',
@@ -541,7 +558,7 @@ function loadProg(){ let c=null, st=null, e1=0, e2=0, seen={};
 function saveProg(p){ try{ localStorage.setItem(SAVE,JSON.stringify(p)); }catch(e){} }
 let PROG=loadProg();
 const clearedCount=()=>PROG.cleared.filter(Boolean).length;
-const mineCount=()=>Math.min(9, 2+clearedCount());   // 初始 2 矿 + 每通一关 +1，上限 9
+const mineCount=()=>Math.min(9, START_MINES+clearedCount());   // 初始 3 矿 + 每通一关 +1，上限 9
 const unlocked=i=>{
   if(i===0) return true;
   const m=(typeof MAPS!=='undefined') && MAPS[i];
@@ -571,8 +588,8 @@ const TOWERS={
   cannon:{ color:'#c2773a', kind:'ammo', cost:110, desc:'范围溅射 → 升级火焰塔(持续伤害)',
     tiers:[
       {name:'炮塔',   range:120, dmg:30, rate:1.1,  ammoMax:16, ammoCost:4, splash:44, air:false, type:'phys'},
-      {name:'重炮塔', range:124, dmg:30, rate:1.15, ammoMax:18, ammoCost:4, splash:40, air:false, type:'phys'},
-      {name:'火焰塔', range:128, dmg:33, rate:1.1,  ammoMax:20, ammoCost:5, splash:42, air:false, type:'phys', burn:10, burnT:3, evo:1},
+      {name:'重炮塔', range:124, dmg:38, rate:1.05, ammoMax:18, ammoCost:4, splash:46, air:false, type:'phys'},
+      {name:'火焰塔', range:128, dmg:42, rate:1.05, ammoMax:20, ammoCost:5, splash:48, air:false, type:'phys', burn:10, burnT:3, evo:1},
     ],
     perks:[ {key:'napalm', name:'燃油弹', desc:'落点留下燃烧地带，持续灼伤经过的敌人 4 秒'},
             {key:'bigblast', name:'巨型弹', desc:'溅射范围 +45%'} ]},
@@ -605,7 +622,7 @@ const ENEMIES={
   // Charlie 原创角色（SVG 精灵动画，见 chars/）
   swamp:  { name:'沼泽怪',  hp:170, speed:36,  armor:5,  mres:6,  r:16, color:'#d9cf3a', air:false, mdmg:15, sprite:'swampTroll' },
   // 彩虹巨人：Charlie 标注 血量中·速度极快·攻击极高·护甲低
-  rainbow:{ name:'彩虹巨人',hp:120, speed:92,  armor:2,  mres:2,  r:15, color:'#e64032', air:false, mdmg:30, sprite:'rainbowGiant' },
+  rainbow:{ name:'彩虹巨人',hp:120, speed:80,  armor:2,  mres:2,  r:15, color:'#e64032', air:false, mdmg:30, sprite:'rainbowGiant' },
 };
 // 预烘焙所有 SVG 角色的动画帧（异步，完成前用纯色圆占位）
 const SPRITES={};
@@ -702,12 +719,12 @@ const MAPS=[
 })();
 
 // 渐进解锁敌种：每通一关多 1 种，封顶为基础 5 + 3 个变种
+// 渐进解锁：通关数达到要求后加入敌人池（与百科「解锁条件」保持一致）
+const UNLOCK={ biter:2, speeder:3, swamp:3, tanker:4, rainbow:6 };
 function enemyPool(){
   const c=clearedCount();
   const base=['grunt','runner','armor','flyer'];          // 4 基础
-  const extras=['biter','speeder','tanker'];              // 3 解锁
-  const k=Math.min(extras.length, Math.max(0, c-1));      // 通关 2 关后开始解锁
-  return base.concat(extras.slice(0,k));
+  return base.concat(Object.keys(UNLOCK).filter(k=>c>=UNLOCK[k]));
 }
 // 第 6/12/18 关的特殊 Boss
 function bossFor(mi){
@@ -717,37 +734,54 @@ function bossFor(mi){
   return 'boss';
 }
 function wavesFor(mi){
-  const k=1+mi*0.11, W=[];
+  const k=(1+HP_GROWTH*Math.min(mi,9)+HP_GROWTH_LATE*Math.max(0,mi-9))*(EASE_FIRST[mi]||1)
+          *(MAPS[mi]&&MAPS[mi].fork ? 1-FORK_HP_EASE*mi : 1), W=[];
+  const tut=(mi===0);                       // 第 1 关是教学关：飞行兵晚出、少出
   const pool=enemyPool();
   const has=t=>pool.indexOf(t)>=0;
   for(let i=1;i<=12;i++){
     if(i===12){ const bt=bossFor(mi);
-      W.push({ groups:[
+      const esc=[
         {t:'grunt',n:14,gap:0.4},
         {t:'armor',n:9,gap:0.65},
-        {t:'flyer',n:8,gap:0.45},
+        {t:'flyer',n:tut?3:8,gap:0.45},
         ...(has('biter')?[{t:'biter',n:6,gap:0.35}]:[]),
         ...(has('speeder')?[{t:'speeder',n:5,gap:0.4}]:[]),
         ...(has('tanker')?[{t:'tanker',n:3,gap:0.7}]:[]),
-        {t:'swamp',n:4,gap:0.9},
-        {t:'rainbow',n:3,gap:0.6},
-        {t:bt,n:1,gap:0}
-      ], hpMul:1.15*k }); break; }
+        ...(has('swamp')?[{t:'swamp',n:4,gap:0.9}]:[]),
+        ...(has('rainbow')?[{t:'rainbow',n:2,gap:0.6}]:[]),
+      ];
+      // 护卫总数封顶：解锁的种类越多，每种来得越少（后期难在搭配，而不是数量）
+      const tot=esc.reduce((s,g)=>s+g.n,0), f=Math.min(1,BOSS_ESCORT_MAX/tot);
+      for(const g of esc) g.n=Math.max(1,Math.round(g.n*f));
+      W.push({ groups:[...esc,{t:bt,n:1,gap:0}], hpMul:1.15*k }); break; }
     const g=[{t:'grunt',n:7+i*3,gap:Math.max(0.35,0.95-i*0.05)}];
     if(i>=2) g.push({t:'runner',n:3+Math.ceil(i*1.5),gap:0.4});
     if(i>=4) g.push({t:'armor', n:Math.ceil(i/1.5),gap:0.8});
-    if(i>=4) g.push({t:'flyer', n:2+Math.floor(i/1.5),gap:0.5});
+    if(i>=(tut?6:4)) g.push({t:'flyer', n:tut?1+Math.floor(i/3):2+Math.floor(i/1.5), gap:0.5});
     // 解锁的变种从中后期掺入
     if(i>=5 && has('biter'))   g.push({t:'biter',  n:Math.ceil(i*0.7), gap:0.35});
     if(i>=6 && has('speeder')) g.push({t:'speeder',n:Math.ceil(i*0.5), gap:0.5});
     if(i>=7 && has('tanker'))  g.push({t:'tanker', n:Math.ceil(i*0.3), gap:0.8});
-    if(i>=2) g.push({t:'swamp', n:Math.ceil(i/3), gap:1.0});
-    if(i>=4) g.push({t:'rainbow', n:Math.ceil(i/4), gap:0.7});
+    if(i>=3 && has('swamp'))   g.push({t:'swamp', n:Math.ceil(i/3), gap:1.0});
+    if(i>=6 && has('rainbow')) g.push({t:'rainbow', n:1+Math.floor((i-6)/3), gap:0.9});
     W.push({ groups:g, hpMul:(1+i*0.10)*k });
+  }
+  // 后期波次：人少一点、个头硬一点，并在下一波来之前出完
+  const hpOf=gs=>gs.reduce((s,g)=>s+g.n*ENEMIES[g.t].hp,0);
+  for(const w of W){
+    const tot=w.groups.reduce((s,g)=>s+g.n,0);
+    if(tot>WAVE_MAX_UNITS && !w.groups.some(g=>g.t.startsWith('boss'))){
+      const hp0=hpOf(w.groups), f=WAVE_MAX_UNITS/tot;
+      for(const g of w.groups) g.n=Math.max(1,Math.round(g.n*f));
+      w.hpMul*=hp0/hpOf(w.groups)*DENSE_WAVE_HP;
+    }
+    const dur=w.groups.reduce((s,g)=>s+g.n*g.gap,0);
+    if(dur>WAVE_SPAWN_MAX) for(const g of w.groups) g.gap*=WAVE_SPAWN_MAX/dur;
   }
   return W;
 }
-MAPS.forEach((m,i)=>m.waves=wavesFor(i));
+MAPS.forEach((m,i)=>{ if(!m.endless) m.waves=wavesFor(i); });   // 开局时还会按最新解锁重算
 // 统一：单线地图也包成 routes；m.path = 主线（兼容旧引用）
 MAPS.forEach(m=>{ if(!m.routes) m.routes=[m.path]; m.routes=m.routes.map(smoothPath); m.path=m.routes[0]; });
 
@@ -880,12 +914,12 @@ const CODEX={
       intro:'沼泽怪：从沼泽水里爬出来的三节甲壳怪。',
       origin:'Charlie 设计。上黄下绿的身体是常年泡在沼泽里留下的"水位线"。',
       habits:'用前腿末端的触手拍打拦路的士兵；被打倒后会沉回沼泽，只剩一串气泡。',
-      traits:['Charlie 原创角色','血厚、移速中等','触手近战'] },
+      traits:['Charlie 原创角色','解锁条件：通关 3 关','血厚、移速中等','触手近战'] },
     rainbow:{
       intro:'彩虹巨人：背着一座彩色尖峰王冠的螃蟹形巨怪，六条长臂。',
       origin:'Charlie 设计。彩虹斜纹的身体上长着三张尖牙嘴，比一个人高出好几倍。',
       habits:'横着小碎步跑得飞快，用带钳子和黄色拳头的长臂砸向拦路的士兵。',
-      traits:['Charlie 原创角色','速度极快、攻击极高','血量中等、护甲低'] },
+      traits:['Charlie 原创角色','解锁条件：通关 6 关','速度极快、攻击极高','血量中等、护甲低'] },
   }
 };
 /* ---- Codex · English lore ---- */
@@ -956,11 +990,11 @@ const CODEX_EN={
     swamp:{ intro:'Swamp Troll: a three-shelled creature that crawls out of the swamp.',
       origin:'Designed by Charlie. Its yellow-top, green-bottom body is a "waterline" from living half-submerged.',
       habits:'Slaps blocking soldiers with the tentacles on its front legs; when beaten it sinks back into the swamp in a trail of bubbles.',
-      traits:['Original character by Charlie','Tough · medium speed','Tentacle melee'] },
+      traits:['Original character by Charlie','Unlocks after 3 missions','Tough · medium speed','Tentacle melee'] },
     rainbow:{ intro:'Rainbow Giant: a crab-like giant carrying a crown of rainbow spikes, with six long arms.',
       origin:'Designed by Charlie. Its rainbow-striped body has three toothy mouths, and it towers over a person several times.',
       habits:'Scuttles sideways at great speed and smashes blocking soldiers with its pincers and yellow fists.',
-      traits:['Original character by Charlie','Very fast · very high attack','Medium HP · low armour'] },
+      traits:['Original character by Charlie','Unlocks after 6 missions','Very fast · very high attack','Medium HP · low armour'] },
   },
 };
 // 一句话用于列表预览（占位常量，便于代码读取）
@@ -1485,8 +1519,9 @@ class Shot{
 /* ---------- 关卡控制 ---------- */
 function startGame(mi){
   const M=MAPS[mi];
+  if(!M.endless) M.waves=wavesFor(mi);   // 按当前已解锁的敌种生成（通关后不用刷新页面）
   const sp=genSpace(M.routes, themeFor(mi));
-  G={ mi, M, routes:M.routes, path:M.routes[0], pads:genPads(M.routes, mi), gold:200, lives:20, livesMax:20,
+  G={ mi, M, routes:M.routes, path:M.routes[0], pads:genPads(M.routes, mi), gold:200+(M.fork?FORK_BONUS_GOLD:0), lives:20, livesMax:20,
       clock:0, nextWaveAt:Infinity, spawnList:[],
       mines:mineCount(), waveIdx:0, totalWaves:M.waves.length, _ri:0,
       enemies:[], corpses:[], pendingEnemies:[], towers:[], shots:[], blasts:[], zones:[], phase:'prep', spawnQ:[], spawnT:0,
@@ -1498,6 +1533,7 @@ function startGame(mi){
   selectedBuild=null; selectedTower=null; speed=1; paused=false; rallySetFor=null;
   if($('pausebtn')) $('pausebtn').textContent=t('pause');
   hideOverlays(); closeBuildMenu(); buildTowerList(); refreshHUD(); updateWaveBtn(); renderSel();
+  if(M.fork && !M.endless) flash(t('forkBonus').replace('{n}',FORK_BONUS_GOLD));
 }
 // 把一波的敌人按相对节奏排入「绝对时间表」spawnList
 function scheduleWave(waveIdx){
@@ -1511,8 +1547,10 @@ function scheduleWave(waveIdx){
   }
   G.spawnList.sort((a,b)=>a.spawnAt-b.spawnAt);
 }
+function earlyLockLeft(){ return G.started ? Math.max(0, G.lastWaveAt + EARLY_LOCK - G.clock) : 0; }
 function launchWave(early){
   if(G.waveIdx>=G.totalWaves) return;
+  if(early && earlyLockLeft()>0) return;              // 冷却中：不能连续提前
   // 提前奖励：根据节省的秒数给金币（首波 nextWaveAt=Infinity 时不奖励）
   if(early && isFinite(G.nextWaveAt)){
     const saved=Math.max(0, G.nextWaveAt - G.clock);
@@ -1520,7 +1558,7 @@ function launchWave(early){
       G.gold+=r; flash(t('earlyBonus').replace('{n}',r)); }
   }
   scheduleWave(G.waveIdx);
-  G.waveIdx++; G.phase='combat'; G.started=true;
+  G.waveIdx++; G.phase='combat'; G.started=true; G.lastWaveAt=G.clock;
   G.nextWaveAt = (G.waveIdx<G.totalWaves) ? G.clock + WAVE_INTERVAL : Infinity;
   updateWaveBtn(); refreshHUD();
 }
@@ -1900,6 +1938,8 @@ function updateWaveBtn(){ const b=$('waveBtn'); if(!G) return;
   if(G.waveIdx>=G.totalWaves){ b.disabled=true; b.textContent=t('waveDone'); return; }
   if(!G.started){ b.disabled=false; b.textContent=t('wave1'); return; }
   const wait=Math.max(0,Math.ceil(G.nextWaveAt-G.clock));
+  const lock=earlyLockLeft();
+  if(lock>0){ b.disabled=true; b.textContent=t('waveLocked').replace('{n}',G.waveIdx+1).replace('{s}',Math.ceil(lock)); return; }
   const reward=Math.max(0,Math.round((G.nextWaveAt-G.clock)*EARLY_REWARD_PER_SEC));
   b.disabled=false;
   b.textContent=t('waveEarly').replace('{n}',G.waveIdx+1).replace('{s}',wait).replace('{g}',reward); }
@@ -2269,8 +2309,8 @@ function buildMapCards(){
     const label = isEnd ? (i+'. '+mapName(m,i)) : ((i+1)+'. '+mapName(m,i));
     const detail = isEnd
       ? (EN?`Lives 20 · Waves ∞<br>Best: Wave ${endBest}`:`生命 20 · 波数 ∞<br>历史最佳：第 ${endBest} 波`)
-      : (EN?`Lives 20 · ${m.waves.length} waves<br>Final BOSS · ${mineCount()} rigs${starTxt}`
-           :`生命 20 · ${m.waves.length} 波<br>末波 BOSS · 进场 ${mineCount()} 矿${starTxt}`);
+      : (EN?`Lives 20 · ${m.waves.length} waves${m.fork?' · split +'+FORK_BONUS_GOLD+' cr':''}<br>Final BOSS · ${mineCount()} rigs${starTxt}`
+           :`生命 20 · ${m.waves.length} 波${m.fork?' · 分叉 +'+FORK_BONUS_GOLD+'金':''}<br>末波 BOSS · 进场 ${mineCount()} 矿${starTxt}`);
     d.innerHTML=`<h4>${label}</h4><div class="d">${detail}</div>${tag}`;
     d.insertBefore(mapThumb(m.path), d.firstChild);
     if(!lock) d.onclick=()=>playIntro(i);

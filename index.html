@@ -148,7 +148,7 @@
   #ovSettings .bHome  { background:#8a3a3a; }
   #ovSettings .bAdmin { background:#6a4ab0; }
   /* 建造位弹出菜单（出现在该建造位旁边） */
-  #buildMenu { position:absolute; display:none; z-index:14; transform:translate(-50%,-115%);
+  #buildMenu { position:absolute; display:none; z-index:14;
     background:rgba(18,24,32,.96); border:1px solid #3a4658; border-radius:10px;
     padding:6px; gap:5px; box-shadow:0 8px 24px rgba(0,0,0,.5); }
   #buildMenu.on { display:flex; }
@@ -161,7 +161,7 @@
   #buildMenu .bm canvas { display:block; margin:0 auto; position:static; }
   /* 选中塔后的信息面板（出现在该塔旁边） */
   #topPanel { position:absolute; display:none; z-index:13; left:480px; top:8px;
-    transform:translateX(-50%); width:248px;
+    width:248px;
     background:rgba(18,24,32,.95); border:1px solid #3a4658; border-radius:10px;
     padding:8px 10px; font-size:11px; box-shadow:0 6px 20px rgba(0,0,0,.45); }
   #topPanel.on { display:block; }
@@ -1008,6 +1008,7 @@ function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.im
 //   得分 = 射程内路段的「未被覆盖程度」之和 × 多段加成（能同时打到几段不同的路）；
 //   已被多个塔位覆盖的路段权重递减，所以既会选出火力交汇点，也会照顾到每一段路。
 const PAD_RANGE=125, PAD_GAP=58;
+const PAD_R=18, TAP_R=34;          // 塔位画出来的半径；点击判定半径（手指点偏一点也算）
 function padBlocked(M,x,y){
   if(x<26||x>934||y<26||y>594) return true;
   if((x<112&&y<72)||(x<200&&y>560)) return true;                       // 左上按钮、左下矿石指示
@@ -1828,15 +1829,15 @@ function draw(){
   // 建造位
   for(const p of G.pads){
     if(p.tower) continue;
-    const hov = selectedBuild && dist(mouse.x,mouse.y,p.x,p.y)<16;
-    ctx.fillStyle = hov? 'rgba(95,174,95,.5)' : 'rgba(120,140,165,.16)';
-    ctx.strokeStyle = hov? '#6cc66c' : 'rgba(140,160,185,.4)';
-    ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(p.x,p.y,13,0,7); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle='rgba(140,160,185,.5)'; ctx.beginPath();
-    ctx.moveTo(p.x-5,p.y); ctx.lineTo(p.x+5,p.y); ctx.moveTo(p.x,p.y-5); ctx.lineTo(p.x,p.y+5); ctx.stroke();
+    const hov = (selectedBuild && dist(mouse.x,mouse.y,p.x,p.y)<PAD_R) || G._buildPad===p;
+    ctx.fillStyle = hov? 'rgba(95,174,95,.45)' : 'rgba(150,170,195,.2)';
+    ctx.strokeStyle = hov? '#6cc66c' : 'rgba(205,220,240,.6)';
+    ctx.lineWidth=2; ctx.beginPath(); ctx.arc(p.x,p.y,PAD_R,0,7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle='rgba(225,235,250,.75)'; ctx.lineWidth=2; ctx.beginPath();
+    ctx.moveTo(p.x-7,p.y); ctx.lineTo(p.x+7,p.y); ctx.moveTo(p.x,p.y-7); ctx.lineTo(p.x,p.y+7); ctx.stroke();
   }
   if(selectedBuild){
-    let np=null,bd=18; for(const p of G.pads){ if(p.tower)continue; const d=dist(mouse.x,mouse.y,p.x,p.y); if(d<bd){bd=d;np=p;} }
+    let np=null,bd=PAD_R; for(const p of G.pads){ if(p.tower)continue; const d=dist(mouse.x,mouse.y,p.x,p.y); if(d<bd){bd=d;np=p;} }
     if(np){ ctx.beginPath(); ctx.strokeStyle='rgba(245,196,81,.5)';
       ctx.arc(np.x,np.y,TOWERS[selectedBuild].tiers[0].range,0,7); ctx.stroke(); }
   }
@@ -2050,7 +2051,7 @@ function handleTap(mx,my){
     if(dd>R){ dx=dx/dd*R; dy=dy/dd*R; }
     t.rally={x:t.x+dx, y:t.y+dy}; t.rallyUser=true;
     rallySetFor=null; flash(LANG==='en'?'Rally point set':'集结点已设定'); renderSel(); return; }
-  const TOL=(typeof PLAT!=='undefined'?PLAT.tap:24);
+  const TOL=TAP_R;
   // 已建的塔优先（点它=升级面板）
   let pick=null,bt=TOL; for(const t of G.towers){ const d=dist(mx,my,t.x,t.y); if(d<bt){bt=d;pick=t;} }
   if(pick){ const now=performance.now();
@@ -2081,8 +2082,7 @@ function openBuildMenu(pad){
       closeBuildMenu(); selectedTower=tw; renderSel(); refreshHUD(); };
     el.appendChild(b);
   }
-  el.style.left=pad.x+'px'; el.style.top=(pad.y-16)+'px';
-  el.classList.add('on');
+  el.classList.add('on'); placeNear(el,pad.x,pad.y,PAD_R+6);
 }
 function closeBuildMenu(){ const el=$('buildMenu'); if(el){ el.classList.remove('on'); el.innerHTML=''; } if(G) G._buildPad=null; }
 let _pDown=null;
@@ -2180,12 +2180,15 @@ function renderSel(){
     b.addEventListener('click',e=>{ if(fired){ e.stopImmediatePropagation(); e.preventDefault(); fired=false; } }, true);
   });
 }
-function placePanel(p,tw){
-  const w=p.offsetWidth, h=p.offsetHeight, gap=26;
-  const x=Math.max(w/2+6, Math.min(GW-w/2-6, tw.x));
-  const y= tw.y-gap-h >= 6 ? tw.y-gap-h : Math.min(GH-h-6, tw.y+gap);
-  p.style.left=x+'px'; p.style.top=y+'px';
+// 把弹出框放在 (x,y) 上方（放不下就放下方），并整个限制在地图范围内
+function placeNear(el,x,y,gap){
+  const w=el.offsetWidth, h=el.offsetHeight, M=6;
+  const left=Math.max(M, Math.min(GW-w-M, x-w/2));
+  let top = y-gap-h>=M ? y-gap-h : y+gap;
+  top=Math.max(M, Math.min(GH-h-M, top));
+  el.style.left=left+'px'; el.style.top=top+'px';
 }
+function placePanel(p,tw){ placeNear(p,tw.x,tw.y,26); }
 function refreshHUD(){ if(!G) return;
   $('hGold').textContent=Math.floor(G.gold); $('hLife').textContent=G.lives;
   $('hWave').textContent=Math.min(G.waveIdx+1,G.totalWaves)+'/'+G.totalWaves;
@@ -2534,7 +2537,8 @@ function buildMapCards(){
 }
 /* ---------- 自适应缩放 + 横竖屏 ---------- */
 function fitStage(){
-  const W=window.innerWidth, H=window.innerHeight;
+  const cs=getComputedStyle($('wrap')), px=k=>parseFloat(cs[k])||0;
+  const W=window.innerWidth-px('paddingLeft')-px('paddingRight'), H=window.innerHeight-px('paddingTop')-px('paddingBottom');
   const scale=Math.min(W/1240, H/620);
   const st=$('stage'); st.style.transform='scale('+scale+')';
   // 窄屏竖屏时提示横屏（仍可游玩，仅提示）

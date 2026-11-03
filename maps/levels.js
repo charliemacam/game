@@ -6,6 +6,7 @@
  *   worms    虫洞：{a:[路线,比例], b:[路线,比例], open:开启秒数, cycle:周期秒数, phase:相位}
  *            开启时，走到 a 的敌人瞬间出现在 b（b 可以在另一条路线上）
  *   holes    黑洞：{x,y,r}，r = 时间膨胀半径；圈内敌人和塔都变慢，并定时引力潮汐把敌人往回拖
+ *   surface  星球地表（月球、火星等，见文件末尾的 SURFACES）
  *   hp       该关敌人血量系数（按自动对局调平，默认 1）
  *   idea     设计意图（只给人看）
  * 画布 960×620；左上角是暂停/设置按钮、左下角是矿石指示，路线和塔位都避开这两块。
@@ -162,5 +163,10 @@ const ENDLESS=[
   holes:[{ x:480, y:310, r:150 }],
   keys:[[480,190],[480,430]], n:14 },
 ];
+// 每关的星球地表（月球 / 火星 / 冰卫星 / 小行星 / 木卫一 / 土卫六 / 火山星）
+const SURFACES=['moon','moon','mars','mars','mars','io',  'asteroid','ice','asteroid','ice','titan','mars',
+  'ice','io','volcanic','asteroid','volcanic','volcanic',  'ice','ice','moon','titan','asteroid','mars','volcanic','io','volcanic'];
+L.forEach((d,i)=>{ d.surface=d.surface||SURFACES[i]; });
+ENDLESS[0].surface='moon'; ENDLESS[1].surface='volcanic';
 window.LEVEL_DESIGNS={ campaign:L, endless:ENDLESS };
 })();

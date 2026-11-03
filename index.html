@@ -645,7 +645,7 @@ const MAPS=[];
     const multi=d.routes.length>1;
     MAPS.push({ name:i>=18?bonusNames[i-18]:'', nameEn:i>=18?bonusNamesEn[i-18]:'', bonus:i>=18,
       diff:(i<3||(i>=6&&i<12&&!multi))?'mid':'hard', lives:LIVES[i]||13, fork:multi?1:0,
-      routes:d.routes, keys:d.keys||[], padN:d.n, worms:d.worms||[], holes:d.holes||[], intro:d.story||null, hp:d.hp||1 });
+      routes:d.routes, keys:d.keys||[], padN:d.n, worms:d.worms||[], holes:d.holes||[], intro:d.story||null, hp:d.hp||1, surface:d.surface });
   });
   // ---- 无限模式：两个独立条目，不计入 LEVELS ----
   function endlessWaves(level){
@@ -670,7 +670,7 @@ const MAPS=[];
   D.endless.forEach((d,j)=>{
     MAPS.push({ name:j?'无限模式 · 困难':'无限模式 · 简单', nameEn:j?'Endless · Hard':'Endless · Easy', diff:'hard', lives:20,
       endless:true, eLevel:j+1, fork:d.routes.length>1?1:0, routes:d.routes, keys:d.keys||[], padN:d.n,
-      worms:d.worms||[], holes:d.holes||[], waves:endlessWaves(j+1) });
+      worms:d.worms||[], holes:d.holes||[], surface:d.surface, waves:endlessWaves(j+1) });
   });
 })();
 
@@ -1619,7 +1619,7 @@ function startGame(mi){
       enemies:[], corpses:[], pendingEnemies:[], towers:[], shots:[], zones:[], phase:'prep', spawnQ:[], spawnT:0,
       running:true, started:false, autoIn:0, stars:sp.stars, planets:sp.planets, theme:sp.theme };
   // 写实太空背景（含道路），开局渲染一次缓存；失败则退回旧的简单背景
-  if(window.Backdrop){ try{ G.bg=Backdrop.render({ theme:sp.theme, variant:mi, seed:mi*977+13, routes:M.routes, pads:G.pads, holes:M.holes, W:GW, H:GH, res:RES }); }
+  if(window.Backdrop){ try{ G.bg=Backdrop.render({ theme:sp.theme, surface:M.surface, seed:mi*977+13, routes:M.routes, pads:G.pads, holes:M.holes, W:GW, H:GH, res:RES }); }
     catch(err){ console.warn('backdrop failed',err); G.bg=null; } }
   G.worms=M.worms.map(w=>({...w,isOpen:false}));
   G.holes=M.holes.map(h=>({...h,tide:10,pulse:0}));

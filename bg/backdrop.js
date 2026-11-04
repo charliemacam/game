@@ -1,9 +1,10 @@
 /* 关卡背景：程序生成的行星地表（每关开局渲染一次并缓存）
  * Backdrop.render({theme, surface, seed, routes, pads, holes, W, H, res}) → { canvas, twinkles }
  *   surface: 'moon' | 'mars' | 'ice' | 'asteroid' | 'io' | 'titan' | 'volcanic'（不传则按 theme 选）
- *   pads / holes：塔位要压平成小场地；黑洞处地面裂开露出星空
- * 画面：高度图（起伏、沙丘、陨坑、巨石）+ 低角度阳光的明暗和投影 + 压实的车辙路 + 立交桥 + 暗角；
- *       战场放在星球边缘，没有路的一侧露出地平线、大气辉光、星空和邻近天体（地球/木星/带环行星/卫星/红星）
+ *   pads / holes：塔位要压平成小场地；黑洞周围不铺地面
+ * 画面：太空（星云、银河、星星、邻近天体：地球/木星/带环行星/卫星/红星、黑洞）
+ *       + 只铺在路和塔位附近的星球地表（高度图、低角度阳光的明暗和投影、压实的车辙路），边缘渐变透明融进太空
+ *       + 立交桥 + 暗角
  */
 (function(){
 function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a);
@@ -280,7 +281,7 @@ const SURF={
   titan:   { alb:[[206,148,86],[164,108,62]],  dark:[118,76,46],  darkK:0.3,  road:[126,82,48],  cr:[10,30],  bo:150, sun:0.58, amb:0.38, relief:12, dune:1.9, haze:[240,170,100,0.12], atm:[255,170,80,0.7], sky:'ringed' },
   volcanic:{ alb:[[76,64,58],[44,38,36]],      dark:[30,26,25],   darkK:0.4,  road:[118,104,94], cr:[30,36],  bo:440, sun:0.52, amb:0.26, relief:18, lava:1, atm:[255,95,45,0.35], sky:'redstar' },
 };
-function ground(W,H,res,routes,pads,holes,S,N,R,hz){
+function ground(W,H,res,routes,pads,holes,S,N,R){
   const q=2, w=Math.ceil(W/q), h=Math.ceil(H/q), n=w*h;
   // 1. 到路中心的距离场：从宽到窄描线，红色通道 = 距离（像素，2 像素一档）
   const dc=document.createElement('canvas'); dc.width=w; dc.height=h; const dg=dc.getContext('2d');
@@ -289,11 +290,12 @@ function ground(W,H,res,routes,pads,holes,S,N,R,hz){
   const DR=dg.getImageData(0,0,w,h).data, D=new Float32Array(n), P=new Float32Array(n);
   for(let i=0;i<n;i++) D[i]=DR[i*4];
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){ let m=1e9; for(const p of pads){ const d=Math.hypot(x*q-p.x,y*q-p.y); if(d<m) m=d; } P[y*w+x]=m; }
-  // 2. 高度图：大起伏 + 细起伏 + 沙丘 + 陨坑 + 巨石
+  // 2. 高度图：大坡 + 岩脊 + 细起伏 + 沙丘 + 陨坑 + 巨石
   const Hm=new Float32Array(n), base=new Float32Array(n);
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const X=x*q, Y=y*q, i=y*w+x;
-    const lo=(N.fbm(X/260,Y/260,1.3,4)-0.5)*S.relief*2;
-    let hh=lo+(N.fbm(X/48,Y/48,5.1,4)-0.5)*S.relief*0.35+(N.n3(X/9,Y/9,7.7)-0.5)*0.9;
+    const lo=(N.fbm(X/240,Y/240,1.3,4)-0.5)*S.relief*3.4;                      // 大坡：路会跟着上下坡
+    const ridge=Math.pow(1-Math.abs(N.fbm(X/150,Y/150,8.8,4)*2-1),3)*S.relief*0.9;   // 岩脊
+    let hh=lo+ridge+(N.fbm(X/48,Y/48,5.1,4)-0.5)*S.relief*0.45+(N.n3(X/9,Y/9,7.7)-0.5)*1.1;
     if(S.dune){ const wv=N.fbm(X/150,Y/150,3.3,3); hh+=Math.pow(Math.abs(Math.sin((X*0.85+Y*0.5)/(15+wv*10)+wv*9)),3)*S.dune*3; }
     base[i]=lo; Hm[i]=hh; }
   const stamp=(cx,cy,ext,fn)=>{ const x0=Math.max(0,Math.floor((cx-ext)/q)), x1=Math.min(w-1,Math.ceil((cx+ext)/q));
@@ -305,12 +307,15 @@ function ground(W,H,res,routes,pads,holes,S,N,R,hz){
   for(let k=0;k<S.bo;k++){ const r=2.5+Math.pow(R(),3)*8, bx=R()*W, by=R()*H, j=((by/q)|0)*w+((bx/q)|0);
     if(D[j]<34+r || P[j]<34+r) continue;
     stamp(bx,by,r,(i,dx,dy)=>{ const d=Math.hypot(dx,dy*1.2)/r; if(d<1) Hm[i]+=r*0.9*Math.sqrt(1-d*d); }); }
-  // 3. 路和塔位：压平、两侧土埂、两道车辙；边缘用噪声打乱
+  // 3. 路和塔位：路面随地势起伏（保留大坡、削掉小起伏），两侧土埂、两道车辙；
+  //    路宽沿路变化，边缘是碎裂的粗糙边（几层不同尺度的噪声），路面留一些坑洼
   const road=new Float32Array(n), rut=new Float32Array(n), pad=new Float32Array(n);
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=y*w+x, X=x*q, Y=y*q;
-    const e=D[i]+(N.fbm(X/22,Y/22,4.4,3)-0.5)*12;
-    const m=1-sstep(18,30,e), berm=Math.exp(-Math.pow((e-29)/5,2))*1.3*(1-m), rt=m*Math.exp(-Math.pow((D[i]-9)/1.7,2))*0.6;
-    Hm[i]=Hm[i]*(1-m)+(base[i]-0.8)*m+berm-rt; road[i]=m; rut[i]=rt;
+    const wide=(N.fbm(X/130,Y/130,6.2,3)-0.5)*12;                               // 路宽变化 ±6
+    const e=D[i]-wide+(N.fbm(X/22,Y/22,4.4,3)-0.5)*12+(N.n3(X/6,Y/6,3.7)-0.5)*7+(N.n3(X/2.6,Y/2.6,1.9)-0.5)*4;
+    const m=1-sstep(19,25,e), berm=Math.exp(-Math.pow((e-27)/4.5,2))*1.5*(1-m), rt=m*Math.exp(-Math.pow((D[i]-9)/1.7,2))*0.6;
+    const pot=m*Math.max(0,N.n3(X/11,Y/11,5.5)-0.72)*7;                        // 坑洼
+    Hm[i]=Hm[i]*(1-m)+(base[i]-0.8+(Hm[i]-base[i])*0.18)*m+berm-rt-pot; road[i]=m; rut[i]=rt;
     const pe=P[i]+(N.n3(X/8,Y/8,2.2)-0.5)*4, pm=1-sstep(19,27,pe);
     Hm[i]=Hm[i]*(1-pm)+(base[i]-0.3)*pm+Math.exp(-Math.pow((pe-28)/3,2))*0.7; pad[i]=pm; }
   // 4. 光照：法线 + 朝太阳方向步进求投影
@@ -318,7 +323,7 @@ function ground(W,H,res,routes,pads,holes,S,N,R,hz){
   const hl=Math.hypot(lx,ly), sx=lx/hl, sy=ly/hl, tanE=lz/hl;
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const cg=cv.getContext('2d');
   const img=cg.createImageData(w,h), O=img.data;
-  const glow=document.createElement('canvas'); glow.width=w; glow.height=h; const gg=glow.getContext('2d'), gimg=gg.createImageData(w,h), GO=gimg.data;
+  const glow=document.createElement('canvas'); glow.width=w; glow.height=h; const gg=glow.getContext('2d'), gimg=gg.createImageData(w,h), GO=gimg.data, GI=[];
   for(let y=0;y<h;y++) for(let x=0;x<w;x++){ const i=y*w+x, X=x*q, Y=y*q, o=i*4;
     const xl=x>0?i-1:i, xr=x<w-1?i+1:i, yu=y>0?i-w:i, yd=y<h-1?i+w:i;
     const gx=(Hm[xr]-Hm[xl])/(q*(xr-xl||1)), gy=(Hm[yd]-Hm[yu])/(q*((yd-yu)/w||1));
@@ -343,15 +348,14 @@ function ground(W,H,res,routes,pads,holes,S,N,R,hz){
       const crust=sstep(0.9,0.955,r)*keep, lv=sstep(0.968,0.99,r)*S.lava*keep;
       c=mix(c,[c[0]*0.45,c[1]*0.45,c[2]*0.45],crust*0.8);
       if(lv>0){ const hot=0.6+0.4*fine; c=mix(c,[255*hot,105*hot,25*hot],lv);
-        GO[o]=255; GO[o+1]=90; GO[o+2]=20; GO[o+3]=lv*110; } }
+        GO[o]=255; GO[o+1]=90; GO[o+2]=20; GO[o+3]=lv*110; GI.push(i); } }
     if(S.haze) c=mix(c,S.haze,S.haze[3]);
-    // 黑洞裂谷：地面裂开，边缘发暗
-    let al=1;
-    for(const hh of holes){ const d=Math.hypot(X-hh.x,Y-hh.y)+(N.n3(X/12,Y/12,6.1)-0.5)*14;
-      al=Math.min(al,sstep(64,72,d)); const rim=1-sstep(72,96,d); c=[c[0]*(1-rim*0.55),c[1]*(1-rim*0.55),c[2]*(1-rim*0.55)]; }
-    if(hz){ const d=Math.hypot(X-hz.cx,Y-hz.cy), k=sstep(hz.r-110,hz.r,d);   // 星球边缘：地面转向背光、变暗，然后是地平线
-      c=[c[0]*(1-0.5*k*k),c[1]*(1-0.5*k*k),c[2]*(1-0.5*k*k)]; al=Math.min(al,sstep(hz.r+1.5,hz.r-1.5,d)); }
+    // 地面只铺在路和塔位附近，往外用噪声打乱的边缘渐渐变透明，露出后面的太空
+    const dm=Math.min(D[i],P[i]+6)+(N.fbm(X/46,Y/46,1.9,3)-0.5)*30;
+    let al=1-sstep(44,92,dm);
+    for(const hh of holes) al=Math.min(al,sstep(52,80,Math.hypot(X-hh.x,Y-hh.y)));   // 黑洞周围是空的
     O[o]=c[0]; O[o+1]=c[1]; O[o+2]=c[2]; O[o+3]=255*al; }
+  for(const i of GI) GO[i*4+3]*=O[i*4+3]/255;
   cg.putImageData(img,0,0);
   // 5. 放大到全分辨率，叠细颗粒、碎石和熔岩辉光
   const out=document.createElement('canvas'); out.width=W*res; out.height=H*res; const og=out.getContext('2d');
@@ -359,8 +363,11 @@ function ground(W,H,res,routes,pads,holes,S,N,R,hz){
   const tile=document.createElement('canvas'); tile.width=tile.height=128; const tg=tile.getContext('2d');
   for(let i=0;i<2600;i++){ const s=0.5+R()*1.1; tg.fillStyle=R()<0.5?`rgba(0,0,0,${0.08+R()*0.14})`:`rgba(255,250,240,${0.05+R()*0.09})`; tg.fillRect(R()*128,R()*128,s,s); }
   og.save(); og.globalCompositeOperation='source-atop'; og.fillStyle=og.createPattern(tile,'repeat'); og.fillRect(0,0,W,H); og.restore();
-  for(let i=0;i<1400;i++){ const x=R()*W, y=R()*H, xi=Math.min(w-1,(x/q)|0), yi=Math.min(h-1,(y/q)|0), j=yi*w+xi;
-    if(O[j*4+3]<250 || D[j]<12 || P[j]<24) continue;
+  const stones=[]; for(let i=0;i<1400;i++) stones.push([R()*W,R()*H]);
+  for(const p of routes) walk(p,5,(x,y,dx,dy)=>{ if(R()<0.55) return; const sd=R()<0.5?-1:1, o=sd*(20+R()*12);
+    stones.push([x-dy*o+(R()-0.5)*4,y+dx*o+(R()-0.5)*4]); });                // 被推到路沿的碎石
+  for(const [x,y] of stones){ if(x<0||y<0||x>=W||y>=H) continue; const xi=Math.min(w-1,(x/q)|0), yi=Math.min(h-1,(y/q)|0), j=yi*w+xi;
+    if(O[j*4+3]<200 || D[j]<15 || P[j]<24) continue;
     const r=0.6+Math.pow(R(),2)*2.2, c=[O[j*4],O[j*4+1],O[j*4+2]];
     og.fillStyle='rgba(0,0,0,.35)'; og.beginPath(); og.ellipse(x+r*0.5,y+r*0.45,r*1.05,r*0.75,0,0,7); og.fill();
     og.fillStyle=rgba(mix(c,[255,255,255],0.18),1); og.beginPath(); og.ellipse(x,y,r,r*0.75,0,0,7); og.fill(); }
@@ -410,37 +417,18 @@ function crossings(routes){
 }
 
 
-/* ---------- 地平线：把战场放在一颗星球的边缘，没有路的那一侧露出太空 ----------
- * 在 24 个方向 × 4 个距离上试一个大圆（星球），半径取「刚好把所有路、塔位、虫洞、黑洞都包住 + 留边」，
- * 选露出太空最多、但不超过画面 42% 的那个。圆心越远，地平线越平。
- */
-function horizon(W,H,routes,pads,holes){
-  const pts=[];
-  for(const p of routes){ walk(p,12,(x,y)=>pts.push([x,y,46])); pts.push([p[0][0],p[0][1],70],[p[p.length-1][0],p[p.length-1][1],70]); }
-  for(const q of pads) pts.push([q.x,q.y,36]);
-  for(const h of holes) pts.push([h.x,h.y,120]);
-  let best=null;
-  for(let k=0;k<24;k++){ const a=k/24*6.2832;
-    for(const D of [560,800,1200,1800,2800]){ const cx=W/2+Math.cos(a)*D, cy=H/2+Math.sin(a)*D;
-      let r=0; for(const [x,y,m] of pts){ const d=Math.hypot(x-cx,y-cy)+m; if(d>r) r=d; }
-      let out=0; for(let gy=0;gy<16;gy++) for(let gx=0;gx<24;gx++) if(Math.hypot((gx+0.5)*W/24-cx,(gy+0.5)*H/16-cy)>r) out++;
-      const f=out/384; if(f>0.42) continue;
-      const sc=f*(1+D/20000);
-      if(!best||sc>best.sc) best={cx,cy,r,sc,f}; } }
-  return best && best.f>=0.035 ? best : null;
-}
-// 地平线外的天体：选太空里离地平线最远的一点，按星球类型画地球、木星、带环行星、卫星或红色恒星
-function skyBody(g,W,H,hz,S,N,R){
+/* ---------- 天体：放在离路和塔位最远的地方（可以一半在画面外），按星球类型选 ---------- */
+function skyBody(g,W,H,routes,pads,S,N,R){
   let bx=0,by=0,bd=-1;
-  for(let y=-60;y<=H+60;y+=12) for(let x=-60;x<=W+60;x+=12){ const d=Math.hypot(x-hz.cx,y-hz.cy)-hz.r; if(d<=0) continue;
-    const e=Math.min(d, 60+Math.min(x+60,y+60,W+60-x,H+60-y)*0.6); if(e>bd){ bd=e; bx=x; by=y; } }
-  if(bd<16) return;
-  const r=Math.min(130,bd*0.75), L=[-0.55,-0.45,0.7];
-  if(S.sky==='redstar'){ sun(g,W,H,bx,by,Math.min(26,r*0.3),[255,110,50],false); return; }
+  for(let y=-90;y<=H+90;y+=15) for(let x=-90;x<=W+90;x+=15){
+    let d=routeDist(x,y,routes); for(const q of pads) d=Math.min(d,Math.hypot(q.x-x,q.y-y)+20);
+    const e=d-Math.max(0,-x,-y,x-W,y-H)*0.5; if(e>bd){ bd=e; bx=x; by=y; } }
+  const r=Math.max(34,Math.min(170,bd*0.85)), L=[-0.55,-0.45,0.7];
+  if(S.sky==='redstar'){ sun(g,W,H,bx,by,Math.min(24,r*0.25),[255,110,50],false); return; }
   if(S.sky==='earth')  { sphere(g,W,H,bx,by,r,{ ...habitableTex(N), light:L, atmo:[110,170,255], tilt:0.35, spin:R()*6 }); return; }
-  if(S.sky==='moon')   { sphere(g,W,H,bx,by,Math.min(r,40),{ ...moonTex(N,R), light:L }); return; }
+  if(S.sky==='moon')   { sphere(g,W,H,bx,by,Math.min(r,60),{ ...moonTex(N,R), light:L }); return; }
   if(S.sky==='jupiter'){ sphere(g,W,H,bx,by,r,{ ...gasTex(N), light:L, tilt:0.2, atmo:[230,210,170] }); return; }
-  const tilt=-0.35; rings(g,bx,by,r*0.62,tilt,'back',L); sphere(g,W,H,bx,by,r*0.62,{ ...gasTex(N), light:L, tilt, atmo:[230,210,170] }); rings(g,bx,by,r*0.62,tilt,'front',L);
+  const tilt=-0.35, pr=r*0.6; rings(g,bx,by,pr,tilt,'back',L); sphere(g,W,H,bx,by,pr,{ ...gasTex(N), light:L, tilt, atmo:[230,210,170] }); rings(g,bx,by,pr,tilt,'front',L);
 }
 
 /* ---------- 主入口 ---------- */
@@ -450,34 +438,23 @@ function render(o){
   const R=mulberry(o.seed|0), N=makeNoise((o.seed|0)+7);
   const cv=document.createElement('canvas'); cv.width=W*res; cv.height=H*res;
   const g=cv.getContext('2d'); g.scale(res,res);
-  const S=SURF[surf], hz=o.horizon===false?null:horizon(W,H,routes,pads,holes), twinkles=[];
-  if(holes.length||hz){                               // 地平线外 / 黑洞裂谷里能看到的星空
-    const gr=g.createLinearGradient(0,0,W,H); gr.addColorStop(0,T.base[0]); gr.addColorStop(0.5,T.base[1]); gr.addColorStop(1,T.base[2]);
-    g.fillStyle=gr; g.fillRect(0,0,W,H);
-    const ang=R()*6.28, band={ x:W*(0.2+R()*0.6), y:H*(0.2+R()*0.6), nx:Math.cos(ang), ny:Math.sin(ang), sig:70+R()*40 };
-    skyLayer(g,W,H,T,N,R,band); starfield(g,W,H,R,band,twinkles,[]);
-    if(hz) skyBody(g,W,H,hz,S,N,R);
-    for(const h of holes) blackHole(g,h.x,h.y,17);
-  }
-  g.drawImage(ground(W,H,res,routes,pads,holes,S,N,R,hz),0,0,W,H);
-  if(hz && S.atm){                                    // 地平线上的大气辉光
-    const [ar,ag,ab,ak]=S.atm, rg=g.createRadialGradient(hz.cx,hz.cy,hz.r-14,hz.cx,hz.cy,hz.r+34);
-    rg.addColorStop(0,`rgba(${ar},${ag},${ab},0)`); rg.addColorStop(0.3,`rgba(${ar},${ag},${ab},${ak})`); rg.addColorStop(1,`rgba(${ar},${ag},${ab},0)`);
-    g.save(); g.globalCompositeOperation='screen'; g.fillStyle=rg; g.fillRect(0,0,W,H); g.restore(); }
-  else if(hz){ g.strokeStyle='rgba(255,250,240,.25)'; g.lineWidth=1; g.beginPath(); g.arc(hz.cx,hz.cy,hz.r-1,0,7); g.stroke(); }   // 没有大气：只有一道受光的边
-  for(const h of holes){                              // 裂谷有深度：内壁阴影 + 受光的崖口
-    g.save(); g.beginPath(); g.arc(h.x,h.y,74,0,7); g.clip();
-    const sg=g.createRadialGradient(h.x+6,h.y+8,30,h.x+6,h.y+8,74);
-    sg.addColorStop(0,'rgba(0,0,0,0)'); sg.addColorStop(0.7,'rgba(0,0,0,.25)'); sg.addColorStop(1,'rgba(0,0,0,.85)');
-    g.fillStyle=sg; g.fillRect(h.x-80,h.y-80,160,160); g.restore();
-    g.strokeStyle='rgba(255,235,210,.18)'; g.lineWidth=1.5; g.beginPath(); g.arc(h.x,h.y,69,Math.PI*0.95,Math.PI*1.75); g.stroke(); }
+  const S=SURF[surf], twinkles=[];
+  // 太空：星云 + 银河 + 星星 + 一个邻近天体 + 黑洞
+  const gr=g.createLinearGradient(0,0,W,H); gr.addColorStop(0,T.base[0]); gr.addColorStop(0.5,T.base[1]); gr.addColorStop(1,T.base[2]);
+  g.fillStyle=gr; g.fillRect(0,0,W,H);
+  const ang=R()*6.28, band={ x:W*(0.2+R()*0.6), y:H*(0.2+R()*0.6), nx:Math.cos(ang), ny:Math.sin(ang), sig:70+R()*40 };
+  skyLayer(g,W,H,T,N,R,band); starfield(g,W,H,R,band,twinkles,routes);
+  skyBody(g,W,H,routes,pads,S,N,R);
+  for(const h of holes) blackHole(g,h.x,h.y,20);
+  // 路和附近的地貌（边缘渐变透明）
+  g.drawImage(ground(W,H,res,routes,pads,holes,S,N,R),0,0,W,H);
   bridges(g,routes);
   const vg=g.createRadialGradient(W/2,H/2,H*0.5,W/2,H/2,W*0.75);
   vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.4)');
   g.fillStyle=vg; g.fillRect(0,0,W,H);
-  // 只有露在太空里的亮星才闪
-  const tw=twinkles.filter(t=>(!hz||Math.hypot(t.x-hz.cx,t.y-hz.cy)>hz.r+6) && !holes.some(h=>Math.hypot(t.x-h.x,t.y-h.y)<60) && (hz||holes.length));
-  return { canvas:cv, twinkles:tw, theme, surface:surf, horizon:hz };
+  // 只有露在太空里的亮星才闪（离路、塔位、黑洞都远）
+  const tw=twinkles.filter(t=>routeDist(t.x,t.y,routes)>100 && !pads.some(q=>Math.hypot(q.x-t.x,q.y-t.y)<70) && !holes.some(h=>Math.hypot(t.x-h.x,t.y-h.y)<60));
+  return { canvas:cv, twinkles:tw, theme, surface:surf };
 }
 
 // 每帧叠加：远处亮星的闪烁

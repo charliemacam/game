@@ -173,7 +173,20 @@
   #topPanel .acts button { flex:1 1 0; min-width:42px; padding:6px 3px; border-radius:6px;
     border:none; cursor:pointer; color:#fff; line-height:1.05; text-align:center; }
   #topPanel .acts button .ig { font-size:17px; display:block; }
-  #topPanel .acts button .ct { font-size:9px; font-style:normal; opacity:.9; display:block; margin-top:1px; }
+  #topPanel .acts button .lb { font-size:11px; font-style:normal; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #topPanel .acts button .ct { font-size:11px; font-style:normal; color:#ffe08a; display:block; margin-top:1px; min-height:13px; }
+  #topPanel .acts button.bOwned { background:#2d4a36; } #topPanel .acts button.bOwned .ig { color:#9fe0a8; } #topPanel .acts button.bOwned .ct { color:#9fe0a8; }
+  #topPanel .acts button.armed { outline:2px solid #ffe08a; outline-offset:1px; box-shadow:0 0 12px rgba(255,224,138,.6); }
+  /* 按钮预览卡片 */
+  #pvCard { position:absolute; left:0; width:100%; background:rgba(14,19,27,.97); border:1px solid #4a5a70; border-radius:9px;
+    padding:8px 10px; box-shadow:0 6px 18px rgba(0,0,0,.5); pointer-events:none; z-index:2; }
+  #pvCard .pvt { font-size:14px; font-weight:bold; color:#ffe08a; margin-bottom:4px; }
+  #pvCard .pvr { font-size:12.5px; color:#cfd6df; line-height:1.55; display:flex; gap:6px; align-items:baseline; }
+  #pvCard .pvr span { color:#8b97a8; min-width:62px; }
+  #pvCard .pvr b { font-weight:600; } #pvCard .pvr b.gd { color:#7ee08f; } #pvCard .pvr b.bd { color:#ff8e8e; }
+  #pvCard .pvn { font-size:12px; color:#c8b4ff; line-height:1.5; margin-top:3px; }
+  #pvCard .pvc { font-size:13px; color:#ffe08a; margin-top:5px; font-weight:600; } #pvCard .pvc.no { color:#ff8e8e; }
+  #pvCard .pvk { font-size:12px; color:#fff; background:#3a7d44; border-radius:5px; padding:3px 6px; margin-top:6px; text-align:center; }
   body.touch #topPanel .acts button { padding:9px 3px; }
   #topPanel .acts button:disabled, #topPanel .acts button.dim { opacity:.45; }
   .bUp{background:#3a7d44;} .bAmmo{background:#b08018;}
@@ -1717,7 +1730,6 @@ function updateSelLive(){
     const bar=$('liveAmmoBar'); if(bar){ bar.style.width=(tw.ammo/S.ammoMax*100)+'%';
       bar.style.background=tw.ammo<=0?'#c14b4b':'#f5c451'; }
     const btn=$('liveAmmoBtn'); if(btn) btn.textContent=(S.ammoMax-tw.ammo)*S.ammoCost;
-    if(btn&&btn.parentElement) btn.parentElement.title=t('refill')+' ('+(S.ammoMax-tw.ammo)*S.ammoCost+' '+t('gold')+')';
   } else {
     const eS=$('liveSoldiers'); if(!eS) return;
     eS.textContent = tw.soldiers.length+'/'+S.count;
@@ -1725,7 +1737,6 @@ function updateSelLive(){
     const bar=$('liveWpBar'); if(bar){ bar.style.width=(tw.wp/S.wpMax*100)+'%';
       bar.style.background=tw.wp<=0?'#c14b4b':'#8ad6a0'; }
     const btn=$('liveWpBtn'); if(btn) btn.textContent=Math.ceil((S.wpMax-tw.wp)*S.repair);
-    if(btn&&btn.parentElement) btn.parentElement.title=t('repair')+' ('+Math.ceil((S.wpMax-tw.wp)*S.repair)+' '+t('gold')+')';
   }
 }
 // 虫洞按周期开关；黑洞定时引力潮汐：把膨胀圈里的敌人沿路往回拖
@@ -1862,6 +1873,9 @@ function draw(){
       ctx.fillStyle=t.wp<=0?'#c14b4b':'#8ad6a0'; ctx.fillRect(bx,by,w*(t.wp/t.S.wpMax),4);
       if(t.wp<=0){ ctx.fillStyle='#ff6b6b'; ctx.font='10px sans-serif'; ctx.textAlign='center'; ctx.fillText(LANG==='en'?'WEAPON BROKEN':'武器损坏',t.x,t.y-30); } }
   }
+  if(previewRing && previewRing.tw===selectedTower){ const pr=previewRing;     // 升级预览：新射程
+    ctx.save(); ctx.setLineDash([7,6]); ctx.lineDashOffset=-T*12; ctx.strokeStyle='rgba(126,224,143,.85)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(pr.tw.x,pr.tw.y,pr.r,0,7); ctx.stroke(); ctx.restore(); }
   // 集结点（选中兵营或正在设置时显示旗帜 + 范围）
   const rallyT = rallySetFor || (selectedTower&&selectedTower.kind==='weapon'?selectedTower:null);
   if(rallyT && rallyT.rally){
@@ -2111,74 +2125,128 @@ function buildTowerList(){
 function syncSel(){ document.querySelectorAll('.tbtn').forEach(b=>{
   b.classList.toggle('sel', b.dataset.k===selectedBuild);
   b.classList.toggle('dis', G && G.gold<TOWERS[b.dataset.k].cost); }); }
-// 返回紧凑图标按钮（进入 .acts 行）
-function perkBlockHTML(tw){
-  if(tw.tier<3){
-    const evo=nmTower(tw.key,tw.tier+1), c=tw.upCost();
-    const dim=G.gold>=c?'':' dim';
-    return `<button class="bUp${dim}" id="bUp" title="${t('upTo').replace('{n}','Lv'+(tw.tier+1)+' '+evo).replace('{c}',c)}"><span class="ig">⬆</span><i class="ct">${c}</i></button>`;
-  }
-  const pc=Math.round(tw.def.cost*2); let h='';
-  for(const pk of tw.def.perks){
-    const pn=perkName(pk), pd=perkDesc(pk);
-    if(tw.perks[pk.key])
-      h+=`<button disabled title="${pn} — ${pd}"><span class="ig" style="color:#9fe0a8">✓</span><i class="ct">${pn}</i></button>`;
-    else {
-      const dim=G.gold>=pc?'':' dim';
-      h+=`<button class="bUp${dim}" id="perk_${pk.key}" title="${pn} — ${pd} (${pc} ${t('gold')})"><span class="ig">✦</span><i class="ct">${pn}</i></button>`;
+/* ---------- 选中塔的面板：按钮随塔的等级变化（1、2 级：补给/升级/卖；3 级：补给/两个特性/卖）
+ * 每个按钮都有预览小卡片：升级后各项数值怎么变、特性效果、花费（钱不够标红），升级时地图上显示新射程。
+ * 有鼠标：悬停看预览，点击直接执行；触屏：第一下看预览，按钮变成「再点确认」，第二下才执行（防误触）。
+ * 补给和集结点不花大钱、经常用，触屏也是一点就执行。
+ */
+// 触屏设备（iPad、手机）：body.touch 让按钮更大，升级等按钮改成「点一下预览、再点确认」
+if(matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
+const HOVER_MQ=matchMedia('(hover: hover) and (pointer: fine)');
+const canHover=()=>HOVER_MQ.matches && !document.body.classList.contains('touch');
+let selArm=null, selPrev=null, previewRing=null, selFor=null;   // 触屏已选中待确认的按钮；正在预览的按钮；预览射程圈；它们属于哪座塔
+const perkCost=tw=>Math.round(tw.def.cost*2);
+function refillCost(tw){ const S=tw.S; return tw.kind==='ammo' ? (S.ammoMax-tw.ammo)*S.ammoCost : Math.ceil((S.wpMax-tw.wp)*S.repair); }
+// 面板按钮：图标 + 文字 + 价格
+function actBtn(act,cls,icon,label,cost,extra){
+  return `<button class="${cls}" data-act="${act}" ${extra||''}><span class="ig">${icon}</span><i class="lb">${label}</i><i class="ct">${cost}</i></button>`;
+}
+function actButtonsHTML(tw){
+  const EN=LANG==='en', h=[];
+  const rc=refillCost(tw);
+  h.push(actBtn('refill','bAmmo',tw.kind==='ammo'?'🔄':'🔧',tw.kind==='ammo'?(EN?'Refill':'补给'):(EN?'Repair':'修武器'),
+    `<span id="${tw.kind==='ammo'?'liveAmmoBtn':'liveWpBtn'}">${rc}</span>`));
+  if(tw.kind==='weapon') h.push(actBtn('rally','bUp'+(rallySetFor===tw?' dim':''),'📍',EN?'Rally':'集结点',''));
+  if(tw.tier<3){ const c=tw.upCost(); h.push(actBtn('up','bUp'+(G.gold>=c?'':' dim'),'⬆',EN?'Upgrade':'升级',c)); }
+  else for(const pk of tw.def.perks){
+    if(tw.perks[pk.key]) h.push(actBtn('perk:'+pk.key,'bOwned','✓',perkName(pk),EN?'Owned':'已拥有'));
+    else { const c=perkCost(tw); h.push(actBtn('perk:'+pk.key,'bUp'+(G.gold>=c?'':' dim'),'✦',perkName(pk),c)); } }
+  h.push(actBtn('sell','bSell','✖',EN?'Sell':'卖掉','+'+tw.sellVal()));
+  return h.join('');
+}
+// 预览卡片内容
+function actPreviewHTML(tw,act){
+  const EN=LANG==='en', S=tw.S, G2=t('gold');
+  const row=(name,a,b,better)=>{ const cls=a===b?'':(better?'gd':'bd');
+    return `<div class="pvr"><span>${name}</span><b>${a}</b>${a===b?'':` → <b class="${cls}">${b}</b>`}</div>`; };
+  const cost=(c,sign)=>`<div class="pvc${sign||G.gold>=c?'':' no'}">${sign?(EN?'You get ':'返还 ')+'+'+c:(EN?'Cost ':'花费 ')+c} ${G2}${!sign&&G.gold<c?(EN?' · not enough':' · 金币不足'):''}</div>`;
+  const confirm=(!canHover() && selArm===act)?`<div class="pvk">${EN?'Tap again to confirm':'再点一次确认'}</div>`:'';
+  if(act==='up'){
+    const N=tw.def.tiers[tw.tier], nt=tw.tier+1;
+    let h=`<div class="pvt">⬆ Lv${nt} ${nmTower(tw.key,nt)}${N.evo?' ✦':''}</div>`;
+    if(tw.kind==='ammo'){
+      h+=row(t('dmg'),S.dmg,N.dmg,N.dmg>S.dmg)+row(t('range'),Math.round(S.range),N.range,N.range>S.range)
+        +row(EN?'Fire interval':'攻击间隔',S.rate+'s',N.rate+'s',N.rate<S.rate)
+        +row(EN?'Ammo':'弹药上限',S.ammoMax,N.ammoMax,N.ammoMax>S.ammoMax)+row(t('perShot'),S.ammoCost+G2,N.ammoCost+G2,N.ammoCost<S.ammoCost);
+      if(N.splash) h+=row(EN?'Splash':'溅射',S.splash,N.splash,N.splash>S.splash);
+      if(N.slow&&!S.slow) h+=`<div class="pvn">✦ ${EN?'Evolves: hits slow enemies to ':'进化：命中让敌人减速到 '}${Math.round(N.slow*100)}%</div>`;
+      if(N.burn&&!S.burn) h+=`<div class="pvn">✦ ${EN?'Evolves: sets enemies on fire, ':'进化：让敌人燃烧，'}${N.burn}${EN?'/s for ':' /秒 · '}${N.burnT}s</div>`;
+      if(N.evo&&tw.key==='arrow') h+=`<div class="pvn">✦ ${EN?'Evolves: long-range sniper':'进化：超远射程狙击'}</div>`;
+    } else {
+      h+=row(t('soldiers'),S.count,N.count,N.count>S.count)+row(EN?'Troop HP':'单兵血量',S.sHp,N.sHp,N.sHp>S.sHp)
+        +row(EN?'Troop DMG':'单兵伤害',S.sDmg,N.sDmg,N.sDmg>S.sDmg)+row(EN?'Armour':'护甲',S.armor||0,N.armor||0,(N.armor||0)>(S.armor||0))
+        +row(EN?'Weapon':'武器耐久',S.wpMax,N.wpMax,N.wpMax>S.wpMax)+row(t('range'),Math.round(S.range),N.range,N.range>S.range);
+      if(N.evo) h+=`<div class="pvn">✦ ${EN?'Evolves: heavy-armoured knights':'进化：重甲骑士'}</div>`;
     }
+    return h+cost(tw.upCost())+confirm;
   }
-  return h;
+  if(act.startsWith('perk:')){ const pk=tw.def.perks.find(x=>'perk:'+x.key===act);
+    return `<div class="pvt">✦ ${perkName(pk)}</div><div class="pvn">${perkDesc(pk)}</div>`
+      +(tw.perks[pk.key]?`<div class="pvc">${EN?'Already owned':'已拥有'}</div>`:cost(perkCost(tw))+confirm); }
+  if(act==='refill'){ const am=tw.kind==='ammo';
+    return `<div class="pvt">${am?'🔄 '+(EN?'Refill ammo':'补给弹药'):'🔧 '+(EN?'Repair weapons':'修武器')}</div>`
+      +(am?row(t('ammo'),Math.round(tw.ammo),S.ammoMax,true):row(t('weapon'),Math.round(tw.wp),S.wpMax,true))
+      +cost(refillCost(tw))+`<div class="pvn">${EN?'Tip: double-tap a tower to refill it':'小技巧：双击塔也能一键补满'}</div>`; }
+  if(act==='rally') return `<div class="pvt">📍 ${EN?'Rally point':'集结点'}</div><div class="pvn">${EN?'Then tap a spot in range: troops gather there.':'点了之后，再点射程内的地面，士兵就去那里集合。'}</div>`;
+  if(act==='sell') return `<div class="pvt">✖ ${EN?'Sell tower':'卖掉这座塔'}</div>`+cost(tw.sellVal(),true)+confirm;
+  return '';
+}
+// 显示/隐藏预览：卡片挂在面板下方（放不下就放上方），不改变面板位置，鼠标悬停不会抖动
+function showPreview(tw,act){
+  const p=$('topPanel'); let pv=$('pvCard');
+  if(!act){ selPrev=null; previewRing=null; if(pv) pv.remove(); p.querySelectorAll('.acts button').forEach(b=>b.classList.remove('armed')); return; }
+  selPrev=act; previewRing = act==='up' ? {tw, r:tw.def.tiers[tw.tier].range} : null;
+  if(!pv){ pv=document.createElement('div'); pv.id='pvCard'; p.appendChild(pv); }
+  pv.innerHTML=actPreviewHTML(tw,act);
+  const below=p.offsetTop+p.offsetHeight+pv.offsetHeight+10<=GH;
+  pv.style.top = below ? (p.offsetHeight+6)+'px' : (-pv.offsetHeight-6)+'px';
+  p.querySelectorAll('.acts button').forEach(b=>b.classList.toggle('armed', !canHover() && b.dataset.act===selArm));
+}
+// 执行按钮动作
+function doAct(tw,act){
+  const EN=LANG==='en';
+  if(act==='refill'){ refillTower(tw); }
+  else if(act==='rally'){ rallySetFor = rallySetFor===tw?null:tw;
+    flash(rallySetFor?(EN?'Tap a spot in range to place the rally point':'点地图上的位置放置集结点（范围内）'):(EN?'Cancelled':'已取消')); }
+  else if(act==='up'){ if(tw.tier>=3) return; const c=tw.upCost();
+    if(G.gold<c){ sfx('deny'); flash(t('needGold').replace('{n}',c)); return; }
+    G.gold-=c; tw.upgrade(); sfx('upgrade',{x:tw.x}); if(window.Fx) Fx.upgrade(tw.x,tw.y);
+    flash((EN?'Upgraded to ':'已升级为 ')+nmTower(tw.key,tw.tier)+(EN?'':'！')); }
+  else if(act.startsWith('perk:')){ const pk=tw.def.perks.find(x=>'perk:'+x.key===act), c=perkCost(tw);
+    if(tw.perks[pk.key]){ flash(EN?'Already owned':'已拥有该特性'); return; }
+    if(G.gold<c){ sfx('deny'); flash(t('needGold').replace('{n}',c)); return; }
+    G.gold-=c; tw.perks[pk.key]=true; sfx('perk',{x:tw.x}); if(window.Fx) Fx.upgrade(tw.x,tw.y); flash((EN?'Perk gained: ':'获得特性：')+perkName(pk)); }
+  else if(act==='sell'){ G.gold+=tw.sellVal(); tw.pad.tower=null; sfx('sell',{x:tw.x}); if(window.Fx) Fx.sell(tw.x,tw.y);
+    G.towers=G.towers.filter(x=>x!==tw); selectedTower=null; }
+  selArm=null; refreshHUD(); renderSel();
 }
 function renderSel(){
-  const p=$('topPanel'); if(!selectedTower){ p.style.display='none'; p.innerHTML=''; return; }
+  const p=$('topPanel'); if(!selectedTower){ p.style.display='none'; p.innerHTML=''; selArm=null; selPrev=null; previewRing=null; return; }
   const tw=selectedTower, d=tw.def, S=tw.S; p.style.display='block';
+  if(selFor!==tw){ selArm=null; selPrev=null; previewRing=null; selFor=tw; }    // 换了一座塔：清掉待确认/预览状态
+  const valid=a=>a && (a==='up' ? tw.tier<3 : a.startsWith('perk:') ? tw.tier>=3 : true);
+  if(!valid(selArm)) selArm=null; if(!valid(selPrev)) selPrev=null;
   let body=`<button id="pClose">×</button><div style="font-size:14px;font-weight:bold;color:${d.color}">${nmTower(tw.key,tw.tier)} · Lv${tw.tier}${S.evo?' ✦':''}</div>`;
-  const sellBtn=`<button class="bSell" id="bSell" title="${t('sell')} +${tw.sellVal()}"><span class="ig">✖</span><i class="ct">+${tw.sellVal()}</i></button>`;
   if(tw.kind==='ammo'){
     body+=`<div class="stat">${t('dmg')} ${S.dmg} · ${t('range')} ${Math.round(S.range)}<br>${t('ammo')} <span id="liveAmmo">${Math.round(tw.ammo)}/${S.ammoMax}</span> · ${t('perShot')} ${S.ammoCost}${t('gold')}</div>
-      <div class="bar"><i id="liveAmmoBar" style="width:${tw.ammo/S.ammoMax*100}%;background:${tw.ammo<=0?'#c14b4b':'#f5c451'}"></i></div>
-      <div class="acts">
-        <button class="bAmmo" id="bAmmo" title="${t('refill')} (${(S.ammoMax-tw.ammo)*S.ammoCost} ${t('gold')})"><span class="ig">🔄</span><i class="ct" id="liveAmmoBtn">${(S.ammoMax-tw.ammo)*S.ammoCost}</i></button>
-        ${perkBlockHTML(tw)}
-        ${sellBtn}
-      </div>`;
+      <div class="bar"><i id="liveAmmoBar" style="width:${tw.ammo/S.ammoMax*100}%;background:${tw.ammo<=0?'#c14b4b':'#f5c451'}"></i></div>`;
   } else {
     body+=`<div class="stat">${t('soldiers')} <span id="liveSoldiers">${tw.soldiers.length}/${S.count}</span> · ${t('perSoldier')} ${S.sDmg}/${S.sHp}<br>${t('weapon')} <span id="liveWp">${Math.round(tw.wp)}/${S.wpMax}</span></div>
-      <div class="bar"><i id="liveWpBar" style="width:${tw.wp/S.wpMax*100}%;background:${tw.wp<=0?'#c14b4b':'#8ad6a0'}"></i></div>
-      <div class="acts">
-        <button class="bAmmo" id="bWp" title="${t('repair')} (${Math.ceil((S.wpMax-tw.wp)*S.repair)} ${t('gold')})"><span class="ig">🔧</span><i class="ct" id="liveWpBtn">${Math.ceil((S.wpMax-tw.wp)*S.repair)}</i></button>
-        <button class="bUp${rallySetFor===tw?' dim':''}" id="bRally" title="${rallySetFor===tw?t('rallyGo'):t('rally')}"><span class="ig">📍</span><i class="ct">${t('rally')}</i></button>
-        ${perkBlockHTML(tw)}
-        ${sellBtn}
-      </div>`;
+      <div class="bar"><i id="liveWpBar" style="width:${tw.wp/S.wpMax*100}%;background:${tw.wp<=0?'#c14b4b':'#8ad6a0'}"></i></div>`;
   }
+  body+=`<div class="acts">${actButtonsHTML(tw)}</div>`;
   if(tw.dil<0.99) body+=`<div class="stat" style="color:#c8b4ff">⏳ ${LANG==='en'?'Time dilation: fire rate':'时间膨胀：攻速'} −${Math.round((1-tw.dil)*100)}%</div>`;
   p.innerHTML=body; placePanel(p,tw);
-  if($('bAmmo')) $('bAmmo').onclick=()=>{ refillTower(tw); renderSel(); };
-  if($('bWp')) $('bWp').onclick=()=>{ refillTower(tw); renderSel(); };
-  if($('bRally')) $('bRally').onclick=()=>{ rallySetFor = rallySetFor===tw?null:tw;
-    flash(rallySetFor?(LANG==='en'?'Tap a spot in range to place the rally point':'点地图上的位置放置集结点（范围内）'):(LANG==='en'?'Cancelled':'已取消')); renderSel(); };
-  if($('bUp')) $('bUp').onclick=()=>{ if(tw.tier>=3)return; const c=tw.upCost();
-    if(G.gold<c){ sfx('deny'); flash(t('needGold').replace('{n}',c));return;}
-    G.gold-=c; tw.upgrade(); sfx('upgrade',{x:tw.x}); if(window.Fx) Fx.upgrade(tw.x,tw.y); flash((LANG==='en'?'Upgraded to ':'已升级为 ')+nmTower(tw.key,tw.tier)+(LANG==='en'?'':'！')); refreshHUD(); renderSel(); };
-  if(tw.tier>=3){ const pc=Math.round(tw.def.cost*2);
-    for(const pk of tw.def.perks){ const b=$('perk_'+pk.key); if(!b) continue;
-      b.onclick=()=>{ if(tw.perks[pk.key]){flash(LANG==='en'?'Already owned':'已拥有该特性');return;}
-        if(G.gold<pc){ sfx('deny'); flash(t('needGold').replace('{n}',pc));return;}
-        G.gold-=pc; tw.perks[pk.key]=true; sfx('perk',{x:tw.x}); if(window.Fx) Fx.upgrade(tw.x,tw.y); flash((LANG==='en'?'Perk gained: ':'获得特性：')+perkName(pk)); refreshHUD(); renderSel(); }; } }
-  $('bSell').onclick=()=>{ G.gold+=tw.sellVal(); tw.pad.tower=null; sfx('sell',{x:tw.x}); if(window.Fx) Fx.sell(tw.x,tw.y);
-    G.towers=G.towers.filter(x=>x!==tw); selectedTower=null; refreshHUD(); renderSel(); };
   if($('pClose')) $('pClose').onclick=()=>{ selectedTower=null; renderSel(); };
-  // 长按图标按钮 → 弹出该按钮的说明（触摸设备）；桌面靠 title 悬停
-  p.querySelectorAll('.acts button[title]').forEach(b=>{
-    let lpT, fired=false;
-    b.addEventListener('pointerdown',()=>{ fired=false;
-      lpT=setTimeout(()=>{ fired=true; flash(b.getAttribute('title')); },420); });
-    const clr=()=>clearTimeout(lpT);
-    b.addEventListener('pointerup',clr); b.addEventListener('pointercancel',clr); b.addEventListener('pointerleave',clr);
-    b.addEventListener('click',e=>{ if(fired){ e.stopImmediatePropagation(); e.preventDefault(); fired=false; } }, true);
+  const QUICK={refill:1, rally:1};                         // 触屏上也一点就执行的按钮
+  p.querySelectorAll('.acts button').forEach(b=>{ const act=b.dataset.act;
+    if(canHover()){ b.addEventListener('pointerenter',()=>showPreview(tw,act)); b.addEventListener('pointerleave',()=>showPreview(tw,null)); }
+    b.onclick=()=>{
+      if(act.startsWith('perk:') && tw.perks[act.slice(5)]){ showPreview(tw,act); return; }
+      if(canHover() || QUICK[act] || selArm===act){ doAct(tw,act); return; }
+      selArm=act; showPreview(tw,act); };           // 触屏第一下：只看预览
   });
+  if(selArm) showPreview(tw,selArm); else if(selPrev && canHover()) showPreview(tw,selPrev);
 }
 // 把弹出框放在 (x,y) 上方（放不下就放下方），并整个限制在地图范围内
 function placeNear(el,x,y,gap){

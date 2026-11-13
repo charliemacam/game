@@ -20,6 +20,53 @@ function kf(BASE,frames,p){
   return o;
 }
 
+/* ---- 自然质感（形状和颜色定稿之后再加）----
+ * 不要几何卡通那种完美圆角：
+ *   organic(pts,amp,seed)  手绘感的轮廓：边上随机起伏，再用平滑曲线连起来
+ *   texFilter(id,o)        整个角色套一层滤镜：边缘轻微不规则 + 表面颗粒 + 轮廓内侧压暗
+ *   ao(id,d,w,op)          零件交界处的柔和阴影（接缝、关节、衣褶）
+ *   scratches(...)         刮痕、纤维、蜡笔纹这类细线
+ */
+function organic(pts,amp,seed,opt){
+  opt=opt||{}; const R=rng(seed||1), sub=opt.sub||3, open=!!opt.open, P=[];
+  const n=pts.length, m=open?n-1:n;
+  for(let i=0;i<m;i++){ const a=pts[i], b=pts[(i+1)%n], dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy)||1;
+    for(let k=0;k<sub;k++){ const t=k/sub, j=(k===0)?0.35:1, w=(R()*2-1)*amp*j;
+      P.push([a[0]+dx*t - dy/L*w, a[1]+dy*t + dx/L*w]); } }
+  if(open) P.push(pts[n-1]);
+  const N=P.length, g=i=>open?P[Math.max(0,Math.min(N-1,i))]:P[(i+N)%N];
+  let d=`M${f1(P[0][0])},${f1(P[0][1])}`;
+  for(let i=0;i<(open?N-1:N);i++){ const p0=g(i-1),p1=g(i),p2=g(i+1),p3=g(i+2);
+    d+=`C${f1(p1[0]+(p2[0]-p0[0])/6)},${f1(p1[1]+(p2[1]-p0[1])/6)} ${f1(p2[0]-(p3[0]-p1[0])/6)},${f1(p2[1]-(p3[1]-p1[1])/6)} ${f1(p2[0])},${f1(p2[1])}`; }
+  return open?d:d+'Z';
+}
+// 椭圆上的点（给 organic 用）
+function ring(cx,cy,rx,ry,n,rot){ const a0=rot||0;
+  return [...Array(n)].map((_,i)=>{ const a=a0+i/n*Math.PI*2; return [cx+Math.cos(a)*rx, cy+Math.sin(a)*ry]; }); }
+function texFilter(id,o){ o=o||{};
+  const rough=o.rough??2.4, warpF=o.warpF??0.045, grainF=o.grainF??0.32, grain=o.grain??0.16, rim=o.rim??0.5, seed=o.seed||3;
+  const lin=`type="linear" slope="${f1(grain*5)}" intercept="${(0.5-grain*2.5).toFixed(2)}"`;
+  return `<filter id="${id}" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="${warpF}" numOctaves="2" seed="${seed}" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="${rough}" xChannelSelector="R" yChannelSelector="G" result="r"/>
+    <feTurbulence type="fractalNoise" baseFrequency="${grainF}" numOctaves="3" seed="${seed+5}" result="n"/>
+    <feColorMatrix in="n" type="saturate" values="0" result="ng"/>
+    <feComponentTransfer in="ng" result="gc"><feFuncR ${lin}/><feFuncG ${lin}/><feFuncB ${lin}/><feFuncA type="table" tableValues="1 1"/></feComponentTransfer>
+    <feBlend in="gc" in2="r" mode="soft-light" result="b0"/>
+    <feComposite in="b0" in2="r" operator="in" result="b"/>
+    <feGaussianBlur in="r" stdDeviation="${o.rimBlur||3.5}" result="ab"/>
+    <feColorMatrix in="ab" type="matrix" values="0 0 0 0 .07  0 0 0 0 .05  0 0 0 0 .04  0 0 0 -${rim} ${rim}" result="e"/>
+    <feComposite in="e" in2="r" operator="in" result="ei"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="ei"/></feMerge>
+  </filter>
+  <filter id="${id}-soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${o.aoBlur||3}"/></filter>`;
+}
+function ao(id,d,w,op){ return `<path d="${d}" fill="none" stroke="#1a120c" stroke-width="${w||8}" stroke-linecap="round" opacity="${op||0.35}" filter="url(#${id}-soft)"/>`; }
+function scratches(seed,x0,y0,w,h,n,len,col,sw,op,ang){ const R=rng(seed); let d='';
+  for(let i=0;i<n;i++){ const x=x0+R()*w, y=y0+R()*h, a=(ang==null?(R()-0.5)*2.4:ang+(R()-0.5)*0.5), l=len*(0.4+R()*0.8);
+    d+=`M${f1(x)},${f1(y)}l${f1(Math.cos(a)*l)},${f1(Math.sin(a)*l)}`; }
+  return `<path d="${d}" stroke="${col}" stroke-width="${sw||0.8}" stroke-linecap="round" opacity="${op||0.5}" fill="none"/>`; }
+
 /* ---- 预览页：实时 SVG 动画 ---- */
 class CharRig{
   constructor(def,svg,P){
@@ -86,5 +133,5 @@ function draw(g,B,anim,time,h,opt){
   g.restore();
 }
 
-window.CharSprites={ NS, f1, rng, sstep, kf, CharRig, bake, draw };
+window.CharSprites={ NS, f1, rng, sstep, kf, CharRig, bake, draw, organic, ring, texFilter, ao, scratches };
 })();

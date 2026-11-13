@@ -1,9 +1,9 @@
-/* 彩虹巨人 Rainbow Giant（Charlie 原画：art-pipeline/characters/rainbow-giant/）
+/* 彩虹巨人 Rainbow Giant（Charlie 原画：character-design/rainbow-giant/）
  * 正面视角的螃蟹形巨怪：彩虹斜纹身体、三张尖牙嘴、彩色尖峰王冠、六条长臂、两只紫色螺纹蟹足。
  * Charlie 标注的数值：血量中、速度极快、攻击极高、护甲低。
  */
 (function(){
-const { f1, rng, kf } = window.CharSprites;
+const { f1, rng, kf, texFilter, ao, scratches } = window.CharSprites;
 const OUT='#1e1712';
 const PINK='#e8689c', PINK_HI='#f7a8c6';
 
@@ -92,7 +92,9 @@ function markup(P){
   const tcol=['#7d1f5f','#4f7d2b','#f08a2b','#a02a72','#5e8f33'];
   const crown=tri.map((t,i)=>{ const ty=t.by-t.h;
     return `<path d="M${f1(t.bx-t.w/2)},${f1(t.by)}L${f1(t.tx)},${f1(ty)}L${f1(t.bx+t.w/2)},${f1(t.by)}Z" fill="${tcol[i%tcol.length]}" stroke="${OUT}" stroke-width="2" stroke-linejoin="round"/>
-      <path d="M${f1(t.tx)},${f1(ty+6)}L${f1(t.bx-t.w*0.12)},${f1(t.by-2)}" stroke="#fff" stroke-width="1.6" opacity=".28"/>`; }).join('');
+      <path d="M${f1(t.tx)},${f1(ty+6)}L${f1(t.bx-t.w*0.12)},${f1(t.by-2)}" stroke="#fff" stroke-width="1.6" opacity=".28"/>
+      <path d="M${f1(t.tx+2)},${f1(ty+10)}L${f1(t.bx+t.w*0.3)},${f1(t.by-3)}M${f1(t.tx-1)},${f1(ty+16)}L${f1(t.bx-t.w*0.3)},${f1(t.by-3)}" stroke="#000" stroke-width="1" opacity=".18"/>`; }).join('')
+    + ao(P+'-tex','M-66,-30 Q0,-40 66,-30',9,0.5);
   // 臂根的黑色绒毛
   let tufts=''; for(const A of ARMS){ const [ax,ay]=A.a;
     for(let k=0;k<6;k++){ const ang=Math.atan2(ay+6,ax)+(k-2.5)*0.28, r0=4, r1=10+(k%3)*3;
@@ -102,15 +104,19 @@ function markup(P){
   let spark=''; for(let i=0;i<10;i++) spark+=`<path id="${P}-sp${i}" d="${star}" fill="${scol[i%scol.length]}" stroke="${OUT}" stroke-width=".8" opacity="0"/>`;
 
   return `
-<defs><clipPath id="${P}-bodyc"><path d="${BODY}"/></clipPath></defs>
+<defs><clipPath id="${P}-bodyc"><path d="${BODY}"/></clipPath>
+  ${texFilter(P+'-tex',{rough:2.2,grain:0.17,grainF:0.34,rim:0.42,seed:9})}</defs>
 <ellipse id="${P}-shadow" cx="0" cy="104" rx="150" ry="10" fill="rgba(0,0,0,.25)"/>
-<g id="${P}-flip"><g id="${P}-root"><g id="${P}-bob">
+<g id="${P}-flip"><g id="${P}-root" filter="url(#${P}-tex)"><g id="${P}-bob">
   ${ARMS.map((A,i)=>arm(P,i,A)).join('')}
   ${foot(P,'fL',-66,-1)}${foot(P,'fR',66,1)}
+  ${ao(P+'-tex','M-90,-18 L-74,-10 M-92,8 L-78,6 M90,-18 L74,-10 M92,8 L78,6 M-66,46 L-50,40 M66,46 L50,40',10,0.5)}
   <path d="${BODY}" fill="#e64032"/>
   <g clip-path="url(#${P}-bodyc)">${stripes}
     <path d="${BODY}" fill="none" stroke="rgba(60,10,40,.25)" stroke-width="14" transform="translate(4,6)"/>
-    <ellipse cx="-40" cy="-24" rx="34" ry="7" fill="#fff" opacity=".35" transform="rotate(-6 -40 -24)"/></g>
+    <ellipse cx="-40" cy="-24" rx="34" ry="7" fill="#fff" opacity=".35" transform="rotate(-6 -40 -24)"/>
+    ${scratches(71,-95,-40,190,80,70,12,'#5a1020',0.9,0.3,-0.6)}${scratches(72,-95,-40,190,80,40,10,'#fff6c0',0.8,0.25,-0.6)}
+    ${ao(P+'-tex','M-80,-30 Q0,-44 80,-30',10,0.45)}${ao(P+'-tex','M-90,10 Q-70,34 -40,38 M90,10 Q70,34 40,38',8,0.35)}</g>
   <path d="${BODY}" fill="none" stroke="${OUT}" stroke-width="2.6"/>
   <g id="${P}-eyes">
     <circle cx="-64" cy="0" r="13" fill="#f5d33b" stroke="${OUT}" stroke-width="5"/>
@@ -202,7 +208,7 @@ function apply(el,o){
 
 window.CHARS.rainbowGiant={
   name:'彩虹巨人', nameEn:'Rainbow Giant',
-  source:'characters/rainbow-giant/concept-source/IMG_1754_crop.jpg',
+  source:'rainbow-giant/concept-source/IMG_1754_crop.jpg',
   viewBox:[-235,-205,470,320], foot:[0,104], center:[0,-45], top:-190, flipX:0, gameH:60,
   anims:{
     idle:  {dur:2.4, frames:20},

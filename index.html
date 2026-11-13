@@ -251,7 +251,11 @@
   .cdx h4 { font-size:14px; margin-bottom:2px; }
   .cdx .role { font-size:11px; color:#f5c451; margin-bottom:4px; }
   .cdx p { font-size:11.5px; color:#9fb0c4; line-height:1.55; max-width:none; }
-  .cdx.en h4 { color:#ff8e8e; } .cdx.tw h4 { color:#6cc6ff; } .cdx.ph h4 { color:#c8a8ff; }
+  .cdx.en h4 { color:#ff8e8e; } .cdx.tw h4 { color:#6cc6ff; } .cdx.ph h4 { color:#c8a8ff; } .cdx.sk h4 { color:#ffb86b; }
+  .cdx img.thumb { position:absolute; top:7px; right:7px; width:48px; height:48px; object-fit:cover; border-radius:7px; background:#fff; pointer-events:none; z-index:1; }
+  .cdxHead { grid-column:1/-1; font-size:14px; color:#ffb86b; margin:8px 2px 0; letter-spacing:1px; }
+  .cdxDet .sketch { display:block; width:100%; max-height:46vh; object-fit:contain; border-radius:10px; background:#fff; margin:6px 0 10px; }
+  .cdxDet.sk .nm { color:#ffb86b; }
   .cdx { cursor:pointer; transition:.12s; }
   .cdx:hover { border-color:#f5c451; transform:translateY(-2px); }
   body.touch #codexBody { grid-template-columns:1fr; }
@@ -424,6 +428,10 @@
 <script src="chars/sprite-runtime.js"></script>
 <script src="chars/swamp-troll.js"></script>
 <script src="chars/rainbow-giant.js"></script>
+<script src="chars/tb37-robot.js"></script>
+<script src="chars/clown-man.js"></script>
+<script src="chars/doctor-monster.js"></script>
+<script src="character-design/new-characters/characters.js"></script>
 <script>
 "use strict";
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -539,7 +547,7 @@ const NAMES_EN={
     barracks:['Barracks','Garrison','Knight Keep'] },
   enemies:{ grunt:'Grunt', runner:'Runner', armor:'Shieldbearer', flyer:'Drone Fly', boss:'Overlord',
     bossEarth:'Mountain Lord', bossSpace:'Void Sovereign', bossHell:'Magma Fiend',
-    biter:'Snapper', speeder:'Great Serpent', tanker:'Shield Captain', swamp:'Swamp Troll', rainbow:'Rainbow Giant' },
+    biter:'Snapper', speeder:'Great Serpent', tanker:'Shield Captain', swamp:'Swamp Troll', rainbow:'Rainbow Giant', clown:'Clown-man', doctor:'Doctor Monster', tb37:'TB-37 Robot' },
 };
 function nmTower(key,tier){ const z=TOWERS[key].tiers[tier-1].name;
   return LANG==='en' ? (NAMES_EN.towers[key]||[])[tier-1]||z : z; }
@@ -640,7 +648,20 @@ const ENEMIES={
   swamp:  { name:'沼泽怪',  hp:170, speed:36,  armor:5,  mres:6,  r:16, color:'#d9cf3a', air:false, mdmg:15, sprite:'swampTroll' },
   // 彩虹巨人：Charlie 标注 血量中·速度极快·攻击极高·护甲低
   rainbow:{ name:'彩虹巨人',hp:120, speed:80,  armor:2,  mres:2,  r:15, color:'#e64032', air:false, mdmg:30, sprite:'rainbowGiant' },
+  // 第二批（2026-11 手稿 + Charlie 的回答）。lives = 漏过去扣几条命（Charlie 在头像里写的数字）
+  // 小丑怪：血低、护甲低、无魔抗、近战高且快、跑得快；一半时间在天上飞（每次 3~4 秒），落地休息时才能被拦
+  clown: { name:'小丑怪',  hp:58,  speed:84,  armor:2,  mres:0,  r:13, color:'#d8332c', air:false, mdmg:22, sprite:'clownMan', lives:2,
+           flier:{air:3.5, ground:3.2} },
+  // 怪物博士：血中、无护甲、魔抗中、近战低；很快地给附近的其他博士和机器人加血（不能给自己加）
+  doctor:{ name:'怪物博士',hp:92,  speed:46,  armor:0,  mres:8,  r:13, color:'#2fa3b4', air:false, mdmg:7,  sprite:'doctorMonster', lives:1, healer:true },
+  // TB-37 机器人：血高、护甲 ∞（只有魔法打得动）、魔抗低、移动很慢；近战和远程都高但慢，会吐毒液伤士兵
+  tb37:  { name:'TB-37 机器人',hp:260,speed:20,armor:0, mres:3,  r:17, color:'#26262b', air:false, mdmg:26, sprite:'tb37Robot', lives:5,
+           physImmune:true, poison:true, robot:true },
 };
+// 第二批角色的特殊能力参数（Charlie 说先定临时值，之后按平衡调）
+const POISON_DPS=7, POISON_HIT=14, POISON_R=22, POISON_LIFE=5, SPIT_RANGE=110, SPIT_CD=4, DRIP_CD=4.5;
+const HEAL_CD=1.6, HEAL_FRAC=0.12, HEAL_RANGE=120;
+const DOC_SHOT_DMG=8, DOC_SHOT_CD=1.8, DOC_SHOT_RANGE=100;   // 怪物博士左边的攻击管
 // 预烘焙所有 SVG 角色的动画帧（异步，完成前用纯色圆占位）
 const SPRITES={};
 if(window.CHARS) for(const k in CHARS) CharSprites.bake(CHARS[k],150)
@@ -675,6 +696,9 @@ const MAPS=[];
       if(i>=8) groups.push({t:'tanker', n:Math.floor(i*0.2),   gap:0.8});
       if(i>=3) groups.push({t:'swamp',  n:1+Math.floor(i*0.25), gap:0.9});
       if(i>=5) groups.push({t:'rainbow',n:1+Math.floor(i*0.2),  gap:0.6});
+      if(i>=4) groups.push({t:'clown',  n:1+Math.floor(i*0.25), gap:0.7});
+      if(i>=6) groups.push({t:'doctor', n:1+Math.floor(i*0.15), gap:1.0});
+      if(i>=8) groups.push({t:'tb37',   n:Math.floor(i/8),      gap:2.5});
       if(i%10===0){ groups.push({t: i<30?'boss':(i<50?'bossSpace':'bossHell'), n:1, gap:0}); }
       W.push({ groups, hpMul:mul });
     }
@@ -689,7 +713,7 @@ const MAPS=[];
 
 // 渐进解锁敌种：每通一关多 1 种，封顶为基础 5 + 3 个变种
 // 渐进解锁：通关数达到要求后加入敌人池（与百科「解锁条件」保持一致）
-const UNLOCK={ biter:2, speeder:3, swamp:3, tanker:4, rainbow:6 };
+const UNLOCK={ biter:2, speeder:3, swamp:3, tanker:4, clown:5, rainbow:6, doctor:7, tb37:8 };
 function enemyPool(){
   const c=clearedCount();
   const base=['grunt','runner','armor','flyer'];          // 4 基础
@@ -720,6 +744,13 @@ function wavesFor(mi){
         ...(has('swamp')?[{t:'swamp',n:4,gap:0.9}]:[]),
         ...(has('rainbow')?[{t:'rainbow',n:2,gap:0.6}]:[]),
       ];
+      // 第二批敌种同样按护卫总血量替换：加进来后其余护卫按比例减人
+      const eh=gs=>gs.reduce((s,x)=>s+x.n*ENEMIES[x.t].hp,0), eh0=eh(esc);
+      if(has('clown'))  esc.push({t:'clown',n:2,gap:0.7});
+      if(has('doctor')) esc.push({t:'doctor',n:1,gap:1.0});
+      if(has('tb37'))   esc.push({t:'tb37',n:1,gap:2.5});
+      const NEW2=['clown','doctor','tb37'], er=Math.max(0.3,1-eh(esc.filter(x=>NEW2.includes(x.t)))/eh0);
+      for(const x of esc) if(!NEW2.includes(x.t)) x.n=Math.max(1,Math.round(x.n*er));
       // 护卫总数封顶：解锁的种类越多，每种来得越少（后期难在搭配，而不是数量）
       const tot=esc.reduce((s,g)=>s+g.n,0), f=Math.min(1,BOSS_ESCORT_MAX/tot);
       for(const g of esc) g.n=Math.max(1,Math.round(g.n*f));
@@ -734,7 +765,13 @@ function wavesFor(mi){
     if(i>=7 && has('tanker'))  g.push({t:'tanker', n:Math.ceil(i*0.3), gap:0.8});
     if(i>=3 && has('swamp'))   g.push({t:'swamp', n:Math.ceil(i/3), gap:1.0});
     if(i>=6 && has('rainbow')) g.push({t:'rainbow', n:1+Math.floor((i-6)/3), gap:0.9});
-    W.push({ groups:g, hpMul:(1+i*0.10)*k });
+    // 第二批敌种是「替换」不是「叠加」：加进来以后按比例压低全波血量，整波总血量和原来一样
+    const hpBase=g.reduce((s,x)=>s+x.n*ENEMIES[x.t].hp,0);
+    if(i>=4 && has('clown'))   g.push({t:'clown', n:Math.ceil(i/4), gap:0.7});
+    if(i>=5 && has('doctor'))  g.push({t:'doctor', n:1+Math.floor(i/6), gap:1.1});
+    if(i>=8 && i%2===0 && has('tb37')) g.push({t:'tb37', n:1, gap:2.5});      // 博士常跟在机器人旁边给它修
+    const hpAll=g.reduce((s,x)=>s+x.n*ENEMIES[x.t].hp,0);
+    W.push({ groups:g, hpMul:(1+i*0.10)*k*hpBase/hpAll });
   }
   // 后期波次：人少一点、个头硬一点，并在下一波来之前出完
   const hpOf=gs=>gs.reduce((s,g)=>s+g.n*ENEMIES[g.t].hp,0);
@@ -892,6 +929,21 @@ const CODEX={
       origin:'Charlie 设计。彩虹斜纹的身体上长着三张尖牙嘴，比一个人高出好几倍。',
       habits:'横着小碎步跑得飞快，用带钳子和黄色拳头的长臂砸向拦路的士兵。',
       traits:['Charlie 原创角色','解锁条件：通关 6 关','速度极快、攻击极高','血量中等、护甲低'] },
+    clown:{
+      intro:'小丑怪：披着黑色翅膀披风的条纹圆球，一半时间在天上飞。',
+      origin:'Charlie 设计。红黄条纹的身体下面是一张白色小丑面具，翅膀上沿缀着一排黄蓝绒球。',
+      habits:'每次最多飞三四秒就得落地歇一会儿；飞着的时候只有能打空中的塔打得到，落地时才能被士兵拦住。用翅膀尖的爪手打上勾拳。',
+      traits:['Charlie 原创角色','解锁条件：通关 5 关','一半时间在飞 · 起飞能挣脱拦截','血少、跑得快、上勾拳伤害高','漏过去扣 2 条命'] },
+    doctor:{
+      intro:'怪物博士：戴眼镜、背着蓝绿色药箱的疯狂医生，左手拿刀，右手拿扳手。',
+      origin:'Charlie 设计。白大褂身体又长又横，脸上蒙着布，胸前挂着「Dr Monster」名牌。',
+      habits:'从背包右上方的血量管喷出小球，很快地给附近受伤的怪物博士或机器人加血；不能给自己加，但两个博士会互相加。左边的攻击管会朝附近的士兵射紫色小球，刀用来砍士兵，扳手用来修机器人。',
+      traits:['Charlie 原创角色','解锁条件：通关 7 关','给附近的博士和机器人加血','优先打掉它'] },
+    tb37:{
+      intro:'TB-37 机器人：长着小丑脸的方形黑色大机器人，护甲无限。',
+      origin:'Charlie 设计。灰色肩箱上有三个螺孔，手臂外侧一排红色弯刺，脚下总在滴黑色毒液。',
+      habits:'普通子弹、炮弹、火焰和士兵都伤不了它，只有魔法能打穿。走得很慢，一路留下毒水坑，还会把毒液吐向附近的士兵。士兵打不动它，但能把它拦住。',
+      traits:['Charlie 原创角色','解锁条件：通关 8 关','护甲 ∞：只有魔法塔有效','毒液伤士兵 · 移动很慢','漏过去扣 5 条命'] },
   }
 };
 /* ---- Codex · English lore ---- */
@@ -967,6 +1019,18 @@ const CODEX_EN={
       origin:'Designed by Charlie. Its rainbow-striped body has three toothy mouths, and it towers over a person several times.',
       habits:'Scuttles sideways at great speed and smashes blocking soldiers with its pincers and yellow fists.',
       traits:['Original character by Charlie','Unlocks after 6 missions','Very fast · very high attack','Medium HP · low armour'] },
+    clown:{ intro:'Clown-man: a striped ball in a black winged cape that spends half its time in the air.',
+      origin:'Designed by Charlie. Under the red-and-yellow stripes is a white clown mask, and the top of each wing is trimmed with yellow and blue pompoms.',
+      habits:'It can only fly for three or four seconds before landing for a rest. While airborne only anti-air towers can hit it; soldiers can block it only on the ground. Attacks with uppercuts from the claws on its wing tips.',
+      traits:['Original character by Charlie','Unlocks after 5 missions','Flies half the time · breaks free when it takes off','Low HP · fast · hard uppercut','Costs 2 lives if it gets through'] },
+    doctor:{ intro:'Doctor Monster: a mad doctor in glasses with a teal medicine pack, a knife in one hand and a wrench in the other.',
+      origin:'Designed by Charlie. Its lab-coat body is long and sideways, its face is half covered by a cloth, and it wears a «Dr Monster» name tag.',
+      habits:'Shoots little balls from the health tube at the top right of its pack, quickly healing nearby Doctor Monsters and robots. It cannot heal itself, but two doctors will heal each other. The tube on the left shoots purple bolts at nearby soldiers, the knife is for close fighting, and the wrench is for fixing robots.',
+      traits:['Original character by Charlie','Unlocks after 7 missions','Heals nearby doctors and robots','Take it out first'] },
+    tb37:{ intro:'TB-37 Robot: a big, boxy black robot with a clown face and infinite armour.',
+      origin:'Designed by Charlie. Its grey shoulder boxes have three bolt holes, red hooked spikes run down its arms, and black poison is always dripping beneath it.',
+      habits:'Arrows, cannonballs, fire and soldiers cannot hurt it; only magic gets through. It walks very slowly, leaves puddles of poison and spits poison at nearby soldiers. Soldiers cannot damage it, but they can still hold it back.',
+      traits:['Original character by Charlie','Unlocks after 8 missions','Infinite armour: only magic towers work','Poison hurts soldiers · very slow','Costs 5 lives if it gets through'] },
   },
 };
 // 一句话用于列表预览（占位常量，便于代码读取）
@@ -974,7 +1038,7 @@ const CODEX_LIST_NAMES={ arrow:'箭塔系（→ 狙击塔）', mage:'法师塔�
 const CODEX_ENEMY_NAMES={
   grunt:'小兵', runner:'奔行者', armor:'重甲兵', flyer:'飞行兵', boss:'魔王',
   bossEarth:'山岳之主', bossSpace:'虚空主宰', bossHell:'熔狱魔神',
-  biter:'撕咬虫', speeder:'巨蛇', tanker:'盾兵长', swamp:'沼泽怪', rainbow:'彩虹巨人',
+  biter:'撕咬虫', speeder:'巨蛇', tanker:'盾兵长', swamp:'沼泽怪', rainbow:'彩虹巨人', clown:'小丑怪', doctor:'怪物博士', tb37:'TB-37 机器人',
 };
 
 /* ---------- 路径与建造位 ---------- */
@@ -1227,15 +1291,19 @@ function towerArt(g,key,tier,R,col,empty,ang,kick){
   g.restore();
 }
 // 精灵角色头顶（放血条）：脚底 + 角色内容高度
+const FLY_H=24;                        // 小丑怪飞起来离地多高
 function spriteTopY(e){ const D=CHARS[e.def.sprite], h=D.gameH||e.r*3;
-  return e.y + e.r*0.8 - (D.foot[1]-D.top)*h/D.viewBox[3]; }
+  return e.y + e.r*0.8 - (e.alt||0)*FLY_H - (D.foot[1]-D.top)*h/D.viewBox[3]; }
 // SVG 精灵角色：场上按状态播放动画，图鉴/介绍卡画待机图标
 function spriteArt(g,e){
   const B=SPRITES[e.def.sprite]; if(!B) return false;
   if(e.x===undefined){ CharSprites.draw(g,B,'idle',performance.now()/1000,e.r*2.9,{mode:'icon'}); return true; }
-  const anim = e.dieT!=null ? 'die' : (e.blocker ? 'attack' : 'walk');
-  g.translate(0,e.r*0.8);             // 脚底略低于路径中心，身体落在路上
-  CharSprites.draw(g,B,anim, e.dieT!=null ? e.dieT : (e.animT||0), B.def.gameH||e.r*3,
+  // 一次性动作（吐毒、加血）优先；飞在天上用 fly；被拦住用 attack
+  const anim = e.dieT!=null ? 'die' : (e.act && B.anims[e.act]) ? e.act : ((e.alt||0)>0.5 && B.anims.fly) ? 'fly' : (e.blocker ? 'attack' : 'walk');
+  if(e.alt>0.02 && e.dieT==null){ g.fillStyle='rgba(0,0,0,'+(0.25*e.alt).toFixed(2)+')';   // 飞起来时地上的影子
+    g.beginPath(); g.ellipse(0,e.r*0.8,e.r*1.3,e.r*0.35,0,0,7); g.fill(); }
+  g.translate(0,e.r*0.8-(e.alt||0)*FLY_H);             // 脚底略低于路径中心，身体落在路上；飞行时抬高
+  CharSprites.draw(g,B,anim, e.dieT!=null ? e.dieT : anim===e.act ? e.actT : (e.animT||0), B.def.gameH||e.r*3,
     {flip:e.face<0, flash:(e.hitT||0)/0.12});
   return true;
 }
@@ -1431,12 +1499,63 @@ class Enemy{
     this.lane0 = type==='boss' ? 0 : (Math.random()*2-1)*16;
     this.lph = Math.random()*6.28; this.lw = 0.5+Math.random();
     if(type==='boss'){ this.sumT=6; this.blinkT=5; }     // 召唤 / 短距穿越计时
+    this.act=null; this.actT=0; this.alt=0;
+    if(d.flier){ this.air=true; this.alt=1; this.flyT=d.flier.air*(0.8+Math.random()*0.4); }   // 小丑怪：飞着出场
+    if(d.poison){ this.spitCD=2+Math.random()*2; this.dripCD=2+Math.random()*2; }
+    if(d.healer){ this.healCD=0.8+Math.random(); this.shotCD=1+Math.random(); }
   }
+  // 小丑怪：飞 3~4 秒，落地歇一会儿，再起飞（起飞时挣脱拦截的士兵）
+  _fly(dt){ const F=this.def.flier; this.flyT-=dt;
+    if(this.flyT<=0){
+      if(this.air){ this.air=false; this.flyT=F.ground*(0.8+Math.random()*0.4); }
+      else { this.air=true; this.flyT=F.air*(0.85+Math.random()*0.3);
+        if(this.blocker){ if(this.blocker.target===this) this.blocker.target=null; this.blocker=null; } } }
+    this.alt+=((this.air?1:0)-this.alt)*Math.min(1,dt*5); }
+  // TB-37：脚下滴毒液；附近有士兵就慢慢吐一团毒液过去
+  _poison(dt){ if(this.x===undefined) return;
+    this.dripCD-=dt;
+    if(this.dripCD<=0){ this.dripCD=DRIP_CD; G.poison.push({x:this.x,y:this.y+this.r*0.7,r:POISON_R*0.9,life:POISON_LIFE,max:POISON_LIFE}); }
+    this.spitCD-=dt; if(this.spitCD>0) return;
+    let best=null,bd=SPIT_RANGE;
+    for(const t of G.towers){ if(t.kind!=='weapon') continue;
+      for(const s of t.soldiers){ if(s.dead) continue; const d=dist(this.x,this.y,s.x,s.y); if(d<bd){ bd=d; best=s; } } }
+    if(!best){ this.spitCD=0.5; return; }
+    this.spitCD=SPIT_CD; this.act='spit'; this.actT=0;
+    G.globs.push({x0:this.x,y0:this.y-this.r*2.4,x:best.x,y:best.y,t:-0.3,T:0.55}); }
+  // 怪物博士：从背包右上的血量管喷一个小球，给附近受伤的博士或机器人加血（不能给自己加）
+  _heal(dt){ if(this.x===undefined) return;
+    this.healCD-=dt; if(this.healCD>0) return;
+    let best=null,bd=HEAL_RANGE;
+    for(const e of G.enemies){ if(e===this||e.dead||e.leaked||e.x===undefined||e.hp>=e.maxhp) continue;
+      if(!(e.def.healer||e.def.robot)) continue;
+      const d=dist(this.x,this.y,e.x,e.y); if(d<bd){ bd=d; best=e; } }
+    if(!best){ this.healCD=0.4; return; }
+    this.healCD=HEAL_CD; this.act='heal'; this.actT=0;
+    const D=CHARS[this.def.sprite], [ex,ey]=this._tubePt(D&&D.healPt);
+    G.heals.push({x:ex,y:ey,tgt:best,amt:Math.max(8,Math.round(best.maxhp*HEAL_FRAC)),t:0}); }
+  // 管口在场上的位置（按精灵的缩放和朝向换算）
+  _tubePt(pt){ const D=CHARS[this.def.sprite], sc=D?D.gameH/D.viewBox[3]:0, p=pt||[0,0];
+    return [this.x+(p[0]-(D?D.foot[0]:0))*sc*(this.face<0?-1:1), this.y+this.r*0.8+(p[1]-(D?D.foot[1]:0))*sc]; }
+  // 怪物博士：背包左边的攻击管，朝附近的士兵射一个紫色小球
+  _shoot(dt){ if(this.x===undefined) return;
+    this.shotCD-=dt; if(this.shotCD>0 || this.act) return;
+    let best=null,bd=DOC_SHOT_RANGE;
+    for(const t of G.towers){ if(t.kind!=='weapon') continue;
+      for(const s of t.soldiers){ if(s.dead) continue; const d=dist(this.x,this.y,s.x,s.y); if(d<bd){ bd=d; best=s; } } }
+    if(!best){ this.shotCD=0.4; return; }
+    this.shotCD=DOC_SHOT_CD; this.act='shoot'; this.actT=0;
+    const D=CHARS[this.def.sprite], [ex,ey]=this._tubePt(D&&D.atkPt);
+    G.globs.push({kind:'bolt',x0:ex,y0:ey,x:best.x,y:best.y,t:-0.15,T:0.3,dmg:DOC_SHOT_DMG}); }
   update(dt){
     if(this.hitT>0) this.hitT-=dt;
     this.animT += dt*(this.blocker ? 1 : this.slowF);
     if(this.slowT>0){ this.slowT-=dt; if(this.slowT<=0)this.slowF=1; }
     if(this.burnT>0){ this.burnT-=dt; this.hp-=this.burnDmg*dt; if(this.hp<=0){this.dead=true;return;} }
+    if(this.act){ this.actT+=dt; const D=this.def.sprite&&window.CHARS&&CHARS[this.def.sprite], A=D&&D.anims[this.act];
+      if(!A||this.actT>=A.dur) this.act=null; }
+    if(this.def.flier) this._fly(dt);
+    if(this.def.poison) this._poison(dt);
+    if(this.def.healer){ this._heal(dt); this._shoot(dt); }
     // Boss：定时召唤帮手 + 概率短距离穿越
     if(this.type==='boss'){
       // 召唤与穿越：即使正被士兵拦住也能发动
@@ -1478,6 +1597,10 @@ class Enemy{
   hit(dmg,type){
     // 重甲兵在攻击士兵时盾会放下，护甲失效
     let arm=this.armor;
+    if(this.def.physImmune && type!=='magic'){          // TB-37：护甲 ∞，只有魔法打得动
+      if(this.x!==undefined){ if(window.Fx) Fx.clink(this.x,this.y-this.r*0.6); sfx('clink',{x:this.x});
+        if(G && !G.immuneHint){ G.immuneHint=1; flash(LANG==='en'?'TB-37 has infinite armour: only magic can hurt it!':'TB-37 护甲无限：只有魔法能打伤它！'); } }
+      return; }
     if((this.type==='armor'||this.type==='tanker') && this.blocker) arm = 0;
     const d = type==='magic' ? Math.max(1,dmg-this.mres) : Math.max(1,dmg-arm);
     if(type!=='magic' && arm>=dmg*0.5 && this.x!==undefined){ if(window.Fx) Fx.clink(this.x,this.y-this.r*0.4); sfx('clink',{x:this.x}); }
@@ -1488,6 +1611,9 @@ class Soldier{
     this.x=b.x; this.y=b.y; this.dead=false; this.target=null; }
   reset(){ this.hp=this.maxhp; this.dead=false; this.x=this.b.x; this.y=this.b.y; this.target=null; }
 }
+// 士兵受到非近战伤害（毒液等）：死了就进重生队列
+function hurtSoldier(s,d){ if(s.dead) return; s.hp-=d;
+  if(s.hp<=0){ s.dead=true; if(s.target){ if(s.target.blocker===s) s.target.blocker=null; s.target=null; } s.b.respawn.push({s,t:6}); } }
 // 黑洞时间膨胀：在膨胀圈里越靠近中心越慢；k = 圈心处的最大减速比例
 function timeDil(x,y,k){ let f=1;
   if(G && G.holes) for(const h of G.holes){ const d=dist(x,y,h.x,h.y); if(d<h.r) f=Math.min(f,1-k*(1-d/h.r)); }
@@ -1543,7 +1669,7 @@ class Tower{
       if(s.dead) continue;
       if(regen && s.hp<s.maxhp) s.hp=Math.min(s.maxhp, s.hp + s.maxhp*0.07*dt);
       // 选目标
-      if(!s.target || s.target.dead || s.target.leaked || (s.target.blocker&&s.target.blocker!==s)){
+      if(!s.target || s.target.dead || s.target.leaked || s.target.air || (s.target.blocker&&s.target.blocker!==s)){
         if(s.target&&s.target.blocker===s) s.target.blocker=null; s.target=null;
         let bd=1e9,t=null;
         for(const e of G.enemies){ if(e.dead||e.leaked||e.air||e.blocker) continue;
@@ -1558,11 +1684,11 @@ class Tower{
       else if(s.target){
         fighting++;
         const broken=this.wp<=0;
-        s.target.hp -= (broken? s.dmg*0.15 : s.dmg) * dt;
+        if(!s.target.def.physImmune) s.target.hp -= (broken? s.dmg*0.15 : s.dmg) * dt;   // 打不动 TB-37，只能拦住它
         if(s.target.hp<=0){ s.target.dead=true; s.target.blocker=null; s.target=null; }
         else { const inc=Math.max(1, s.target.def.mdmg-(S.armor||0));
           s.hp -= inc*dt;                                   // 骑士堡护甲减伤
-          if(thorns){ s.target.hp -= inc*0.6*dt;            // 荆棘反伤
+          if(thorns && !s.target.def.physImmune){ s.target.hp -= inc*0.6*dt;            // 荆棘反伤
             if(s.target.hp<=0){ s.target.dead=true; s.target.blocker=null; s.target=null; } }
           if(s.target && s.hp<=0){ s.dead=true; s.target.blocker=null; s.target=null;
             this.respawn.push({s, t:6}); }
@@ -1596,7 +1722,7 @@ class Shot{
     if(splash>0 && P.hasPerk('bigblast')) splash=Math.round(splash*1.45);
     if(splash>0){ for(const e of G.enemies){ if(e.dead||e.leaked) continue;
         if(dist(this.tgt.x,this.tgt.y,e.x,e.y)<=splash){ e.hit(this.dmg,S.type);
-          if(S.burn && !e.dead){ e.burnT=S.burnT; e.burnDmg=S.burn; } } }
+          if(S.burn && !e.dead && !e.def.physImmune){ e.burnT=S.burnT; e.burnDmg=S.burn; } } }
       if(window.Fx) Fx.explosion(this.tgt.x,this.tgt.y,splash,!!S.burn);
       sfx(S.burn?'fireboom':'boom',{x:this.tgt.x});
       if(P.hasPerk('napalm')) G.zones.push({x:this.tgt.x,y:this.tgt.y,r:splash*0.9,life:4,max:4,dps:(S.burn||10)}); }
@@ -1630,7 +1756,7 @@ function startGame(mi){
   G={ mi, M, routes:M.routes, path:M.routes[0], pads:tacticalPads(M, mi), gold:200+(M.fork?FORK_BONUS_GOLD:0), lives:20, livesMax:20,
       clock:0, nextWaveAt:Infinity, spawnList:[],
       mines:mineCount(), waveIdx:0, totalWaves:M.waves.length, _ri:0,
-      enemies:[], corpses:[], pendingEnemies:[], towers:[], shots:[], zones:[], phase:'prep', spawnQ:[], spawnT:0,
+      enemies:[], corpses:[], pendingEnemies:[], towers:[], shots:[], zones:[], poison:[], globs:[], heals:[], phase:'prep', spawnQ:[], spawnT:0,
       running:true, started:false, autoIn:0, stars:sp.stars, planets:sp.planets, theme:sp.theme };
   // 写实太空背景（含道路），开局渲染一次缓存；失败则退回旧的简单背景
   if(window.Backdrop){ try{ G.bg=Backdrop.render({ theme:sp.theme, surface:M.surface, seed:mi*977+13, routes:M.routes, pads:G.pads, holes:M.holes, W:GW, H:GH, res:RES }); }
@@ -1768,7 +1894,7 @@ function step(dt){
   }
   updateWaveBtn();
   for(const e of G.enemies){ if(e.dead||e.leaked) continue; e.update(dt);
-    if(e.leaked){ if(e.blocker)e.blocker=null; G.lives--; flash(t('leak'));
+    if(e.leaked){ if(e.blocker)e.blocker=null; const nl=e.def.lives||1; G.lives=Math.max(0,G.lives-nl); flash(t('leak').replace('-1','-'+nl));
       sfx('leak'); G.hitBase=1; if(window.Fx){ Fx.shake(4); Fx.screenFlash('255,40,40',0.35); }
       if(G.lives<=0){ refreshHUD(); endGame(false); return; } } }
   updatePhenomena(dt);
@@ -1778,8 +1904,26 @@ function step(dt){
   // 燃烧地带（燃油弹特性）
   for(const z of G.zones){ z.life-=dt;
     for(const e of G.enemies){ if(e.dead||e.leaked) continue;
-      if(dist(z.x,z.y,e.x,e.y)<=z.r){ e.hp-=z.dps*dt; if(e.hp<=0) e.dead=true; } }
+      if(!e.def.physImmune && dist(z.x,z.y,e.x,e.y)<=z.r){ e.hp-=z.dps*dt; if(e.hp<=0) e.dead=true; } }
     if(window.Fx && Math.random()<dt*8){ const a=Math.random()*6.28, r=Math.random()*z.r*0.8; Fx.burn(z.x+Math.cos(a)*r,z.y+Math.sin(a)*r*0.8); } }
+  // TB-37 的毒液：地上的毒水坑伤士兵；吐出去的毒团落地后砸伤附近士兵并留下毒水坑
+  for(const z of G.poison){ z.life-=dt;
+    for(const t of G.towers){ if(t.kind!=='weapon') continue;
+      for(const s of t.soldiers) if(!s.dead && dist(z.x,z.y,s.x,s.y)<=z.r) hurtSoldier(s,POISON_DPS*dt); } }
+  for(const b of G.globs){ b.t+=dt;
+    if(b.t>=b.T && !b.done){ b.done=true;
+      for(const t of G.towers){ if(t.kind!=='weapon') continue;
+        for(const s of t.soldiers) if(!s.dead && dist(b.x,b.y,s.x,s.y)<=(b.kind==='bolt'?12:16)) hurtSoldier(s,b.dmg||POISON_HIT); }
+      if(b.kind!=='bolt') G.poison.push({x:b.x,y:b.y,r:POISON_R,life:POISON_LIFE,max:POISON_LIFE});
+      if(window.Fx) Fx.hit('magic',b.x,b.y); } }
+  // 怪物博士的加血小球
+  for(const h of G.heals){ h.t+=dt; const T=h.tgt;
+    if(T.dead||T.leaked){ h.done=true; continue; }
+    const tx=T.x, ty=T.y-T.r, d=dist(h.x,h.y,tx,ty);
+    if(d<8){ h.done=true; T.hp=Math.min(T.maxhp,T.hp+h.amt);
+      if(window.Fx) Fx.text(T.x,T.y-T.r-14,'+'+h.amt,'120,235,140'); }
+    else { const f=Math.min(1,260*dt/d); h.x+=(tx-h.x)*f; h.y+=(ty-h.y)*f; } }
+  G.poison=G.poison.filter(z=>z.life>0); G.globs=G.globs.filter(b=>!b.done); G.heals=G.heals.filter(h=>!h.done);
   // 燃烧 / 冰冻中的敌人冒火苗、冒寒气
   if(window.Fx) for(const e of G.enemies){ if(e.dead||e.x===undefined) continue;
     if(e.burnT>0 && Math.random()<dt*14) Fx.burn(e.x,e.y-e.r*0.3);
@@ -1887,6 +2031,14 @@ function draw(){
     ctx.strokeStyle='#6f5b3a'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(rx,ry+8); ctx.lineTo(rx,ry-12); ctx.stroke();
     ctx.fillStyle='#8ad6a0'; ctx.beginPath(); ctx.moveTo(rx,ry-12); ctx.lineTo(rx+13,ry-8); ctx.lineTo(rx,ry-4); ctx.closePath(); ctx.fill();
   }
+  // 毒水坑（TB-37）
+  for(const z of G.poison){ const a=Math.min(1,z.life/z.max, (z.max-z.life)*4+0.2);
+    ctx.save(); ctx.translate(z.x,z.y); ctx.scale(1,0.45);
+    const pg=ctx.createRadialGradient(-z.r*0.2,-z.r*0.2,1,0,0,z.r);
+    pg.addColorStop(0,'rgba(70,92,48,'+(0.85*a)+')'); pg.addColorStop(0.7,'rgba(22,30,16,'+(0.8*a)+')'); pg.addColorStop(1,'rgba(10,14,8,0)');
+    ctx.fillStyle=pg; ctx.beginPath(); ctx.arc(0,0,z.r,0,7); ctx.fill();
+    ctx.fillStyle='rgba(170,200,120,'+(0.35*a)+')'; ctx.beginPath(); ctx.arc(-z.r*0.3,-z.r*0.3,z.r*0.18,0,7); ctx.fill();
+    ctx.restore(); }
   // 士兵
   for(const t of G.towers){ if(t.kind!=='weapon') continue;
     for(const s of t.soldiers){ ctx.fillStyle='#d8c98a'; ctx.strokeStyle='#10151c'; ctx.lineWidth=1.5;
@@ -1900,6 +2052,15 @@ function draw(){
     ctx.fillStyle=zg; ctx.beginPath(); ctx.arc(z.x,z.y,z.r,0,7); ctx.fill(); }
   // 子弹/爆炸
   for(const s of G.shots) drawShot(s);
+  for(const b of G.globs){ if(b.t<0) continue; const k=Math.min(1,b.t/b.T), x=b.x0+(b.x-b.x0)*k, y=b.y0+(b.y-b.y0)*k-Math.sin(k*Math.PI)*(b.kind==='bolt'?10:30);
+    if(b.kind==='bolt'){ const bg=ctx.createRadialGradient(x,y,0,x,y,7); bg.addColorStop(0,'rgba(245,225,255,1)'); bg.addColorStop(0.4,'rgba(155,77,255,.95)'); bg.addColorStop(1,'rgba(155,77,255,0)');
+      ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(x,y,7,0,7); ctx.fill(); continue; }
+    ctx.fillStyle='#1d2614'; ctx.strokeStyle='#0a0d07'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.ellipse(x,y,5,4,k*3,0,7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='rgba(160,190,110,.6)'; ctx.beginPath(); ctx.arc(x-1.5,y-1.5,1.3,0,7); ctx.fill(); }
+  for(const h of G.heals){ const r=4+Math.sin(h.t*20)*0.8, hg=ctx.createRadialGradient(h.x,h.y,0,h.x,h.y,r*2.2);
+    hg.addColorStop(0,'rgba(255,235,235,1)'); hg.addColorStop(0.35,'rgba(255,70,80,.95)'); hg.addColorStop(1,'rgba(255,70,80,0)');
+    ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(h.x,h.y,r*2.2,0,7); ctx.fill(); }
   // 死亡动画（精灵角色）
   for(const c of G.corpses){ ctx.save(); ctx.translate(c.x,c.y); spriteArt(ctx,c); ctx.restore(); }
   // 敌人（按 y 排序：靠下的画在前面，有前后遮挡感）
@@ -2061,6 +2222,7 @@ function handleTap(mx,my){
   closeBuildMenu();
   // 设置兵营集结点：点地图放置（限制在塔射程内）
   if(rallySetFor){ const t=rallySetFor; let dx=mx-t.x, dy=my-t.y;
+    if(Math.hypot(dx,dy)<PAD_R){ rallySetFor=null; selectedTower=t; flash(LANG==='en'?'Cancelled':'已取消'); renderSel(); return; }
     const dd=Math.hypot(dx,dy), R=t.S.range;
     if(dd>R){ dx=dx/dd*R; dy=dy/dd*R; }
     t.rally={x:t.x+dx, y:t.y+dy}; t.rallyUser=true;
@@ -2206,8 +2368,8 @@ function showPreview(tw,act){
 function doAct(tw,act){
   const EN=LANG==='en';
   if(act==='refill'){ refillTower(tw); }
-  else if(act==='rally'){ rallySetFor = rallySetFor===tw?null:tw;
-    flash(rallySetFor?(EN?'Tap a spot in range to place the rally point':'点地图上的位置放置集结点（范围内）'):(EN?'Cancelled':'已取消')); }
+  else if(act==='rally'){ rallySetFor=tw; selectedTower=null;          // 收起面板，免得挡住要点的地面
+    flash(EN?'Tap a spot in range to place the rally point (tap the tower to cancel)':'点射程内的地面放置集结点（点塔本身取消）'); }
   else if(act==='up'){ if(tw.tier>=3) return; const c=tw.upCost();
     if(G.gold<c){ sfx('deny'); flash(t('needGold').replace('{n}',c)); return; }
     G.gold-=c; tw.upgrade(); sfx('upgrade',{x:tw.x}); if(window.Fx) Fx.upgrade(tw.x,tw.y);
@@ -2415,7 +2577,31 @@ function showCodex(){
     const lore=codexLore('enemy',k);
     add('en', nmEnemy(k), t('enemyUnit'), lore.intro,
       g=>enemyArt(g,{type:k,r:Math.min(16,e.r),def:e}), ()=>showCharDetail('enemy',k)); }
+  // Charlie 手稿里的新角色（还没加入战斗，只在图鉴里展示原画和设定）
+  const sk=(window.SKETCHES||[]).filter(x=>!x.inGame);
+  if(sk.length){ const EN=LANG==='en', h=document.createElement('div'); h.className='cdxHead';
+    h.textContent=EN?`✏️ Charlie's sketchbook: ${sk.length} new characters (coming soon)`:`✏️ Charlie 的手稿：${sk.length} 个新角色（即将登场）`; el.appendChild(h);
+    for(const x of sk){ const c=document.createElement('div'); c.className='cdx sk';
+      c.innerHTML=`<img class="thumb" loading="lazy" src="character-design/new-characters/pictures/${x.id}.jpg" alt=""><div><h4>${EN?x.en:x.zh}</h4><div class="role">${EN?'Sketch · not in battle yet':'手稿 · 尚未登场'}</div><p>${EN?x.desc.en:x.desc.zh}</p></div>`;
+      c.onclick=()=>showSketchDetail(x.id); el.appendChild(c); } }
   hideOverlays(); $('ovCodex').style.display='flex';
+}
+// 手稿角色详情：原画 + Charlie 的标注（数值按他写的「低/中/高」原样显示）
+function showSketchDetail(id){
+  const x=SKETCHES.find(s=>s.id===id), EN=LANG==='en', W=window.SKETCH_WORDS||{};
+  const val=v=>EN?v:String(v).replace(/^([a-z ]+|∞)(\?)?$/,(m,a,q)=>(W[a]||a)+(q||''));
+  const rows=SKETCH_LEGEND.filter(L=>L.k==='lives'?x.lives:x.stats[L.k]!=null)
+    .map(L=>`<tr><td>${L.sym} ${EN?L.en:L.zh}</td><td>${val(L.k==='lives'?x.lives:x.stats[L.k])}</td></tr>`).join('');
+  const spe=x.spe.length?x.spe.map(s=>`<li>${EN?s.en:s.zh}</li>`).join(''):`<li>${EN?'None written yet':'还没写'}</li>`;
+  const el=$('codexBody'); el.style.display='block';
+  el.innerHTML=`<div class="cdxDet sk"><div class="head"><div><div class="nm">${EN?x.en:x.zh} <small style="font-size:14px;color:#93a1b5">${EN?x.zh:x.en}</small></div>
+    <div class="role">${EN?'Charlie\'s sketch · not in battle yet':'Charlie 手稿 · 尚未登场'}${x.by?(EN?' · drawn by ':' · 作者 ')+x.by:''}</div></div></div>
+    <img class="sketch" src="character-design/new-characters/pictures/${x.id}.jpg" alt="">
+    <div class="intro">${EN?'':'「'}${EN?x.desc.en:x.desc.zh}${EN?'':'」'}</div>
+    <h5>${EN?'SPECIAL':'特殊能力'}</h5><ul>${spe}</ul>
+    <h5>${EN?'CHARLIE\'S RATINGS':'Charlie 的标注'}</h5><table><tbody>${rows}</tbody></table>
+    <button class="back" id="cdxToList">${t('backCodex')}</button></div>`;
+  $('cdxToList').onclick=showCodex; el.scrollTop=0;
 }
 /* ---------- 星象：虫洞、黑洞（图鉴条目 + 首次登场介绍卡） ---------- */
 const PHENOMENA={
@@ -2507,8 +2693,10 @@ function showCharDetail(kind,key){
     icon=`<canvas width="64" height="64"></canvas>`;
     const rows=[
       [EN?'HP':'血量',e.hp], [EN?'Speed':'移速',e.speed], [EN?'Armour':'护甲',e.armor], [EN?'Magic res.':'魔抗',e.mres||0],
-      [EN?'Flying':'可飞行',e.air?(EN?'Yes':'是'):(EN?'No':'否')], [EN?'Melee DMG':'近战伤害（对士兵）', e.mdmg],
+      [EN?'Flying':'可飞行',e.flier?(EN?'Half the time':'一半时间'):e.air?(EN?'Yes':'是'):(EN?'No':'否')], [EN?'Melee DMG':'近战伤害（对士兵）', e.mdmg],
+      ...(e.lives>1?[[EN?'Lives lost if it gets through':'漏过去扣命', e.lives]]:[]),
     ];
+    if(e.physImmune) rows[2][1]='∞';
     statsHTML=`<table><tbody>`+rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')+`</tbody></table>`;
   }
   det.innerHTML=`<div class="head">${icon}<div><div class="nm">${nm}</div><div class="role">${role}</div></div></div>

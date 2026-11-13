@@ -1,8 +1,8 @@
-/* 沼泽怪 Swamp Troll（Charlie 原画：art-pipeline/characters/swamp-troll/）
+/* 沼泽怪 Swamp Troll（Charlie 原画：character-design/swamp-troll/）
  * SVG 零件 + 骨骼姿态。朝右画，朝左由运行时镜像。
  */
 (function(){
-const { f1, rng, kf } = window.CharSprites;
+const { f1, rng, kf, texFilter, ao, scratches } = window.CharSprites;
 const OUT='#20180f';
 
 // 毛茸茸的圆（耳朵）
@@ -33,6 +33,11 @@ function fin(P,id,b1,b2,tip,seed){
   </g>`;
 }
 
+// 皮肤上的小斑点（自然质感）
+function spots(seed,cx,cy,r){ const R=rng(seed); let d='';
+  for(let i=0;i<9;i++){ const a=R()*6.28, rr=R()*r*0.85, x=cx+Math.cos(a)*rr, y=cy+Math.sin(a)*rr, q=0.8+R()*1.6;
+    d+=`<ellipse cx="${f1(x)}" cy="${f1(y)}" rx="${f1(q*1.3)}" ry="${f1(q)}" fill="#6f7a1c" opacity=".28"/>`; }
+  return d; }
 // 一节甲壳
 function seg(P,id,cx,cy,r,extra){
   return `<g id="${P}-${id}">
@@ -41,7 +46,9 @@ function seg(P,id,cx,cy,r,extra){
     <g clip-path="url(#${P}-${id}c)">
       <circle cx="${cx-5}" cy="${cy-7}" r="${r}" fill="none" stroke="rgba(40,70,15,.24)" stroke-width="14"/>
       ${extra||''}
-      <ellipse cx="${f1(cx-r*.3)}" cy="${f1(cy-r*.5)}" rx="${f1(r*.32)}" ry="${f1(r*.13)}" transform="rotate(-25 ${f1(cx-r*.3)} ${f1(cy-r*.5)})" fill="#fff" opacity=".45"/>
+      ${scratches(cx*7+cy,cx-r,cy-r,2*r,2*r,26,5,'#4d6a14',0.7,0.4)}
+      ${spots(cx*3+cy,cx,cy,r)}
+      <ellipse cx="${f1(cx-r*.3)}" cy="${f1(cy-r*.5)}" rx="${f1(r*.32)}" ry="${f1(r*.13)}" transform="rotate(-25 ${f1(cx-r*.3)} ${f1(cy-r*.5)})" fill="#fff" opacity=".2"/>
     </g>
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${OUT}" stroke-width="2.4"/>
   </g>`;
@@ -110,12 +117,13 @@ function markup(P){
   <linearGradient id="${P}-fin" x1="0" y1="1" x2="0" y2="0">
     <stop offset="0" stop-color="#e2611c"/><stop offset="1" stop-color="#ffa04c"/>
   </linearGradient>
+  ${texFilter(P+'-tex',{rough:1.4,warpF:0.08,grainF:0.55,grain:0.15,rim:0.42,rimBlur:2.2,aoBlur:1.8,seed:13})}
   <clipPath id="${P}-ground"><rect x="-60" y="-60" width="400" height="230"/></clipPath>
 </defs>
 <ellipse id="${P}-shadow" cx="120" cy="168" rx="80" ry="7" fill="rgba(0,0,0,.25)"/>
 <ellipse id="${P}-puddle" cx="120" cy="168" rx="0" ry="0" fill="#3f5e22" stroke="#2b4316" stroke-width="2"/>
 <g id="${P}-flip">
-<g clip-path="url(#${P}-ground)"><g id="${P}-root"><g id="${P}-bob">
+<g clip-path="url(#${P}-ground)"><g id="${P}-root" filter="url(#${P}-tex)"><g id="${P}-bob">
   <g id="${P}-tail">
     <path d="M64,110 C48,118 34,130 24,142" stroke="${OUT}" stroke-width="13" fill="none" stroke-linecap="round"/>
     <path d="M64,110 C48,118 34,130 24,142" stroke="#8cc93b" stroke-width="9" fill="none" stroke-linecap="round"/>
@@ -140,12 +148,14 @@ function markup(P){
       <path d="M111,90 Q118,96 126,90" fill="none" stroke="${OUT}" stroke-width="2.2" stroke-linecap="round"/>
       <path d="M113,92.5 L111,97 M118,94 L118,99 M123,93 L125,97.5" stroke="${OUT}" stroke-width="1.6" stroke-linecap="round"/>`)}
   ${seg(P,'sF',160,80,30,cap(160,53,24,9))}
+  ${ao(P+'-tex','M107,48 Q102,80 109,112 M146,56 Q141,80 146,106',4,0.22)}
   <g id="${P}-hip">
     <path d="${hipSp}" fill="#f5ead2" stroke="${OUT}" stroke-width="1.1" stroke-linejoin="round"/>
     <path d="M81,113 A17,17 0 0 0 115,113 Z" fill="#c97c2c" stroke="${OUT}" stroke-width="2"/>
     <path d="${zig}" fill="none" stroke="#6b3a12" stroke-width="1.5"/>
     <path d="M84,114 L112,114" stroke="#e7a35a" stroke-width="2" opacity=".7"/>
   </g>
+  ${ao(P+'-tex','M168,78 Q172,92 170,104',5,0.45)}
   <g id="${P}-head">
     ${fin(P,'fin4',[186,70],[194,70],[182,54],4)}
     ${ear(P,'earF',214,74,15,7)}
@@ -248,7 +258,7 @@ function apply(el,o,flipped){
 
 window.CHARS.swampTroll={
   name:'沼泽怪', nameEn:'Swamp Troll',
-  source:'characters/swamp-troll/concept-source/IMG_1702_upright.jpg',
+  source:'swamp-troll/concept-source/IMG_1702_upright.jpg',
   viewBox:[-12,-6,264,186], foot:[120,168], center:[120,90], top:6, flipX:240, gameH:48,
   anims:{
     idle:  {dur:3.0,  frames:24},

@@ -431,6 +431,15 @@
 <script src="chars/tb37-robot.js"></script>
 <script src="chars/clown-man.js"></script>
 <script src="chars/doctor-monster.js"></script>
+<script src="chars/flyer-monster.js"></script>
+<script src="chars/spaceship.js"></script>
+<script src="chars/fire-dragon.js"></script>
+<script src="chars/three-head-ghost.js"></script>
+<script src="chars/rock-zombie.js"></script>
+<script src="chars/wood-monster.js"></script>
+<script src="chars/charger-robot.js"></script>
+<script src="chars/sea-demon.js"></script>
+<script src="chars/slime-monster.js"></script>
 <script src="character-design/new-characters/characters.js"></script>
 <script>
 "use strict";
@@ -547,7 +556,7 @@ const NAMES_EN={
     barracks:['Barracks','Garrison','Knight Keep'] },
   enemies:{ grunt:'Grunt', runner:'Runner', armor:'Shieldbearer', flyer:'Drone Fly', boss:'Overlord',
     bossEarth:'Mountain Lord', bossSpace:'Void Sovereign', bossHell:'Magma Fiend',
-    biter:'Snapper', speeder:'Great Serpent', tanker:'Shield Captain', swamp:'Swamp Troll', rainbow:'Rainbow Giant', clown:'Clown-man', doctor:'Doctor Monster', tb37:'TB-37 Robot' },
+    biter:'Snapper', speeder:'Great Serpent', tanker:'Shield Captain', swamp:'Swamp Troll', rainbow:'Rainbow Giant', clown:'Clown-man', doctor:'Doctor Monster', tb37:'TB-37 Robot', ship:'Spaceship', halfship:'Half Spaceship', pilot:'Flyer Monster', dragon:'Fire Dragon', ghost3:'Three-head Ghost', rockz:'Rock Zombie', wood:'Wood Monster', charger:'Big Charger Robot', seaS:'Small Sea Demon', seaD:'Demon of the Seas', slime:'Slime Monster' },
 };
 function nmTower(key,tier){ const z=TOWERS[key].tiers[tier-1].name;
   return LANG==='en' ? (NAMES_EN.towers[key]||[])[tier-1]||z : z; }
@@ -657,7 +666,40 @@ const ENEMIES={
   // TB-37 机器人：血高、护甲 ∞（只有魔法打得动）、魔抗低、移动很慢；近战和远程都高但慢，会吐毒液伤士兵
   tb37:  { name:'TB-37 机器人',hp:260,speed:20,armor:0, mres:3,  r:17, color:'#26262b', air:false, mdmg:26, sprite:'tb37Robot', lives:5,
            physImmune:true, poison:true, robot:true },
+  // 第三批（2026-11-14 Charlie 的回答）
+  // 飞船 → 半飞船 → 操控怪：同一个故事。飞船在天上（炮塔和士兵打不到），开炮打士兵，炸到附近自己人也有 25% 伤害；
+  //   开炮时变慢；血越少飞得越慢。被打爆变成满血的半飞船，半飞船被打爆跳出驾驶员操控怪。
+  ship:    { name:'飞船',  hp:80,  speed:70, armor:6, mres:0, r:16, color:'#9a9ca0', air:true, mdmg:0, sprite:'spaceship', lives:4,
+             next:'halfship', gun:{dmg:12, cd:1.0, range:120}, hpSlow:0.4, shootSlow:true },
+  halfship:{ name:'半飞船',hp:60,  speed:52, armor:2, mres:0, r:15, color:'#9a9ca0', air:true, mdmg:0, sprite:'halfSpaceship', lives:3,
+             next:'pilot', gun:{dmg:12, cd:1.0, range:120}, hpSlow:0.25 },
+  pilot:   { name:'操控怪',hp:170, speed:30, armor:6, mres:0, r:14, color:'#e98a22', air:false, mdmg:0, sprite:'flyerMonster', lives:2 },
+  // 火焰龙：血低、跑得快、会飞一点点；完全不怕火焰塔；冰霜塔 2.5 倍伤害；喷火会烧伤士兵
+  dragon:  { name:'火焰龙',hp:52,  speed:88, armor:0, mres:0, r:13, color:'#e2412a', air:false, mdmg:12, sprite:'fireDragon', lives:1,
+             flier:{air:2.2, ground:3.2}, fireImmune:true, frostWeak:2.5, burnsSoldiers:true },
+  // 三头鬼：三个头各自血量较低，总血量 = 3 倍；头越少攻击越弱；走过的地方留熔岩（只烧士兵，约 6 秒）
+  ghost3:  { name:'三头鬼',hp:330, speed:42, armor:0, mres:10, r:17, color:'#2a262e', air:false, mdmg:26, sprite:'threeHeadGhost', lives:2,
+             heads:3, lava:true },
+  // 第四批（2026-11-16 Charlie 的回答）。oneShot = 攻击 ∞：每隔这么多秒一下打死拦路的士兵
+  rockz:   { name:'石尸', hp:300, speed:18, armor:14, mres:12, r:17, color:'#cfcfca', air:false, mdmg:0, sprite:'rockZombie', lives:5,
+             oneShot:3.0, sucker:3 },
+  wood:    { name:'木兽', hp:110, speed:26, armor:0, mres:8, r:16, color:'#4a9a2c', air:false, mdmg:0, sprite:'woodMonster', lives:3,
+             oneShot:2.0, physImmune:true, fireOk:0.4 },
+  charger: { name:'大型补电机器人', hp:220, speed:28, armor:12, mres:12, r:17, color:'#aeaeaa', air:false, mdmg:0, sprite:'chargerRobot', lives:1,
+             robot:true, charger:{range:36, hps:8} },
+  seaS:    { name:'小海魔', hp:40, speed:50, armor:0, mres:0, r:10, color:'#3aa8dc', air:false, mdmg:4, sprite:'smallSeaDemon', lives:1,
+             morph:{t:2, into:'seaD'} },
+  seaD:    { name:'海之魔', hp:200, speed:28, armor:0, mres:8, r:16, color:'#d42020', air:false, mdmg:14, sprite:'seaDemon', lives:2,
+             spikes:{dmg:8, cd:1.3, range:110} },
+  slime:   { name:'黏液怪', hp:130, speed:24, armor:0, mres:0, r:17, color:'#7ad83a', air:false, mdmg:0, sprite:'slimeMonster', lives:5,
+             oneShot:3.0, physImmune:true, slimeTrail:true },
 };
+const SOLDIER_BURN=5, SOLDIER_BURN_T=2.5, LAVA_DPS=6, LAVA_LIFE=6, LAVA_EVERY=0.5, SHELL_FF=0.25;
+// 「连体」敌人的总血量（飞船 = 飞船 + 半飞船 + 操控怪），用来算波次血量预算
+function chainHp(t){ let h=0, k=t; while(k){ h+=ENEMIES[k].hp; k=ENEMIES[k].next; } return h; }
+// 算波次预算时，特别难对付的敌种按更高的「等效血量」计（会飞、免疫某种塔、扣命多）
+const BUDGET_W={ dragon:1.6, ship:1.4, ghost3:1.5, rockz:1.5, wood:1.8, slime:2.5, seaS:2.5, seaD:1.1, charger:2.0 };
+const budgetHp=t=>chainHp(t)*(BUDGET_W[t]||1);
 // 第二批角色的特殊能力参数（Charlie 说先定临时值，之后按平衡调）
 const POISON_DPS=7, POISON_HIT=14, POISON_R=22, POISON_LIFE=5, SPIT_RANGE=110, SPIT_CD=4, DRIP_CD=4.5;
 const HEAL_CD=1.6, HEAL_FRAC=0.12, HEAL_RANGE=120;
@@ -699,6 +741,15 @@ const MAPS=[];
       if(i>=4) groups.push({t:'clown',  n:1+Math.floor(i*0.25), gap:0.7});
       if(i>=6) groups.push({t:'doctor', n:1+Math.floor(i*0.15), gap:1.0});
       if(i>=8) groups.push({t:'tb37',   n:Math.floor(i/8),      gap:2.5});
+      if(i>=5) groups.push({t:'dragon', n:Math.ceil(i/5),       gap:0.6});
+      if(i>=7 && i%3===1) groups.push({t:'ship', n:Math.ceil(i/15), gap:3});
+      if(i>=9 && i%2===1) groups.push({t:'ghost3', n:Math.ceil(i/20), gap:3});
+      if(i>=4) groups.push({t:'seaS', n:Math.ceil(i/6), gap:0.6});
+      if(i>=8 && i%3===2) groups.push({t:'seaD', n:1, gap:2});
+      if(i>=8 && i%4===0) groups.push({t:'charger', n:1, gap:2});
+      if(i>=10 && i%3===1) groups.push({t:'slime', n:1, gap:3});
+      if(i>=10 && i%3===0) groups.push({t:'wood', n:Math.ceil(i/15), gap:2});
+      if(i>=12 && i%4===1) groups.push({t:'rockz', n:1, gap:3});
       if(i%10===0){ groups.push({t: i<30?'boss':(i<50?'bossSpace':'bossHell'), n:1, gap:0}); }
       W.push({ groups, hpMul:mul });
     }
@@ -713,7 +764,7 @@ const MAPS=[];
 
 // 渐进解锁敌种：每通一关多 1 种，封顶为基础 5 + 3 个变种
 // 渐进解锁：通关数达到要求后加入敌人池（与百科「解锁条件」保持一致）
-const UNLOCK={ biter:2, speeder:3, swamp:3, tanker:4, clown:5, rainbow:6, doctor:7, tb37:8 };
+const UNLOCK={ biter:2, speeder:3, swamp:3, tanker:4, clown:5, rainbow:6, doctor:7, tb37:8, dragon:9, ship:10, ghost3:11, seaS:5, charger:8, seaD:9, wood:12, rockz:13, slime:14 };
 function enemyPool(){
   const c=clearedCount();
   const base=['grunt','runner','armor','flyer'];          // 4 基础
@@ -745,11 +796,12 @@ function wavesFor(mi){
         ...(has('rainbow')?[{t:'rainbow',n:2,gap:0.6}]:[]),
       ];
       // 第二批敌种同样按护卫总血量替换：加进来后其余护卫按比例减人
-      const eh=gs=>gs.reduce((s,x)=>s+x.n*ENEMIES[x.t].hp,0), eh0=eh(esc);
+      const eh=gs=>gs.reduce((s,x)=>s+x.n*chainHp(x.t),0), eh0=eh(esc);
       if(has('clown'))  esc.push({t:'clown',n:2,gap:0.7});
       if(has('doctor')) esc.push({t:'doctor',n:1,gap:1.0});
       if(has('tb37'))   esc.push({t:'tb37',n:1,gap:2.5});
-      const NEW2=['clown','doctor','tb37'], er=Math.max(0.3,1-eh(esc.filter(x=>NEW2.includes(x.t)))/eh0);
+      if(has('dragon')) esc.push({t:'dragon',n:2,gap:0.6});
+      const NEW2=['clown','doctor','tb37','dragon','ship','ghost3'], er=Math.max(0.3,1-eh(esc.filter(x=>NEW2.includes(x.t)))/eh0);
       for(const x of esc) if(!NEW2.includes(x.t)) x.n=Math.max(1,Math.round(x.n*er));
       // 护卫总数封顶：解锁的种类越多，每种来得越少（后期难在搭配，而不是数量）
       const tot=esc.reduce((s,g)=>s+g.n,0), f=Math.min(1,BOSS_ESCORT_MAX/tot);
@@ -766,11 +818,20 @@ function wavesFor(mi){
     if(i>=3 && has('swamp'))   g.push({t:'swamp', n:Math.ceil(i/3), gap:1.0});
     if(i>=6 && has('rainbow')) g.push({t:'rainbow', n:1+Math.floor((i-6)/3), gap:0.9});
     // 第二批敌种是「替换」不是「叠加」：加进来以后按比例压低全波血量，整波总血量和原来一样
-    const hpBase=g.reduce((s,x)=>s+x.n*ENEMIES[x.t].hp,0);
+    const hpBase=g.reduce((s,x)=>s+x.n*chainHp(x.t),0);
     if(i>=4 && has('clown'))   g.push({t:'clown', n:Math.ceil(i/4), gap:0.7});
     if(i>=5 && has('doctor'))  g.push({t:'doctor', n:1+Math.floor(i/6), gap:1.1});
     if(i>=8 && i%2===0 && has('tb37')) g.push({t:'tb37', n:1, gap:2.5});      // 博士常跟在机器人旁边给它修
-    const hpAll=g.reduce((s,x)=>s+x.n*ENEMIES[x.t].hp,0);
+    if(i>=4 && has('dragon'))  g.push({t:'dragon', n:Math.ceil(i/5), gap:0.6});
+    if(i>=8 && i%4===0 && has('ship'))   g.push({t:'ship', n:1, gap:3});
+    if(i>=7 && i%2===1 && has('ghost3')) g.push({t:'ghost3', n:1, gap:3});
+    if(i>=3 && has('seaS'))   g.push({t:'seaS', n:Math.ceil(i/5), gap:0.6});
+    if(i>=8 && i%4===0 && has('charger') && has('tb37')) g.push({t:'charger', n:1, gap:2});   // 有时跟着 TB-37 给它充电
+    if(i>=6 && i%3===2 && has('seaD'))  g.push({t:'seaD', n:1, gap:2});
+    if(i>=9 && i%4===3 && has('slime')) g.push({t:'slime', n:1, gap:3});
+    if(i>=7 && i%3===0 && has('wood'))  g.push({t:'wood', n:1, gap:2});
+    if(i>=9 && i%4===1 && has('rockz')) g.push({t:'rockz', n:1, gap:3});
+    const hpAll=g.reduce((s,x)=>s+x.n*budgetHp(x.t),0);
     W.push({ groups:g, hpMul:(1+i*0.10)*k*hpBase/hpAll });
   }
   // 后期波次：人少一点、个头硬一点，并在下一波来之前出完
@@ -944,6 +1005,61 @@ const CODEX={
       origin:'Charlie 设计。灰色肩箱上有三个螺孔，手臂外侧一排红色弯刺，脚下总在滴黑色毒液。',
       habits:'普通子弹、炮弹、火焰和士兵都伤不了它，只有魔法能打穿。走得很慢，一路留下毒水坑，还会把毒液吐向附近的士兵。士兵打不动它，但能把它拦住。',
       traits:['Charlie 原创角色','解锁条件：通关 8 关','护甲 ∞：只有魔法塔有效','毒液伤士兵 · 移动很慢','漏过去扣 5 条命'] },
+    ship:{
+      intro:'飞船：顶上三根冒火大炮的灰色圆飞船，驾驶员坐在下面的蓝色舱里。',
+      origin:'Charlie 设计。船身上还有八门小炮。飞船、半飞船和操控怪是同一个故事：被打爆一次就少一半，最后驾驶员自己跳出来。',
+      habits:'飞在天上，只有能打空中的塔打得到，士兵拦不住。朝附近的士兵开炮，炮弹炸开时连附近的自己人也会挨 25% 的伤害。开炮时会变慢，血越少飞得越慢。被打爆后变成满血的半飞船。',
+      traits:['Charlie 原创角色','解锁条件：通关 10 关','飞行单位 · 开炮打士兵','被打爆 → 半飞船 → 操控怪','漏过去扣 4 条命'] },
+    halfship:{
+      intro:'半飞船：被打掉一半的飞船，裂口烧成锯齿，顶盖歪在一边。',
+      origin:'Charlie 设计。大炮全没了，只剩几门小炮；驾驶员还在舱里，舱底已经裂开。',
+      habits:'满血重新出发，继续飞、继续朝士兵开炮；血越少越慢，最后非常慢。再被打爆，驾驶员操控怪就跳出来。',
+      traits:['Charlie 原创角色','飞船被打爆后出现','飞行单位 · 开炮打士兵','被打爆 → 操控怪','漏过去扣 3 条命'] },
+    pilot:{
+      intro:'操控怪：飞船的驾驶员，戴着耳麦、肚子雪白的橙色胖怪物。',
+      origin:'Charlie 设计。耳麦只是装饰。半飞船被打爆后它跳出来，自己走完剩下的路。',
+      habits:'不会攻击，也不会飞，只是慢慢地走；但皮很厚，护甲也不低。',
+      traits:['Charlie 原创角色','半飞船被打爆后出现','不会攻击 · 走得慢','血厚','漏过去扣 2 条命'] },
+    dragon:{
+      intro:'火焰龙：从头到尾红、橙、黄渐变的长身体火龙，有一对红黑条纹的翅膀和八条腿。',
+      origin:'Charlie 设计。黄色的长嘴像鳄鱼，脖子上围着一圈火焰，尾巴卷起来，尾尖是一只爪子。',
+      habits:'跑得快，会飞一小会儿再落地。火焰塔完全伤不到它，冰霜塔对它造成 2.5 倍伤害。被拦住时喷火，被喷到的士兵会烧一阵。',
+      traits:['Charlie 原创角色','解锁条件：通关 9 关','火焰塔无效 · 冰霜塔 2.5 倍伤害','会飞一点点','喷火烧伤士兵'] },
+    ghost3:{
+      intro:'三头鬼：黑暗魔法师的化身，三根脖子顶着三个长角的骷髅头。',
+      origin:'Charlie 设计。胸口还有一张白色狐狸脸，紫色尾巴的尖上也长着一个小头，下身插在一滩熔岩里。',
+      habits:'走过的地方留下熔岩，只烧士兵，大约 6 秒才冷却。三个头可以一个一个打掉，每掉一个头它的攻击就弱一点。',
+      traits:['Charlie 原创角色','解锁条件：通关 11 关','血量很高（三个头的总和）· 魔抗高','头越少攻击越弱','熔岩烧士兵 · 漏过去扣 2 条命'] },
+    rockz:{
+      intro:'石尸：满身裂纹的石头僵尸，一手大锤，一手长弯刀。',
+      origin:'Charlie 设计。它是岩石巨人的手下，但也常常自己出现。头顶两个小角，尖上是黄色的小球。',
+      habits:'攻击无限：挥得很慢，可一下就能打死一个士兵。它还能吸走三个士兵的盔甲和武器：被吸的士兵防御变成 0，兵营的武器补给清空，要花钱修。它自己不会因此变强。死的时候碎成一大块一大块的石头。',
+      traits:['Charlie 原创角色','解锁条件：通关 13 关','一下打死士兵 · 攻击很慢','吸走三个士兵的盔甲和补给','血厚、护甲和魔抗都高 · 漏过去扣 5 条命'] },
+    wood:{
+      intro:'木兽：裹着一圈绿叶的大树桩，正面是一圈圈年轮，两只眼睛也是年轮。',
+      origin:'Charlie 设计。两条长树枝手臂，手是一簇叶子，底下是两丛深棕色的树根。',
+      habits:'护甲无限：普通子弹、炮弹和士兵都伤不了它，魔法能打它，火也能烧它但伤害有限（只有四成）。用树枝手臂打人，一下就能打死一个士兵。',
+      traits:['Charlie 原创角色','解锁条件：通关 12 关','护甲 ∞：魔法有效，火焰塔只有四成伤害','一下打死士兵','漏过去扣 3 条命'] },
+    charger:{
+      intro:'大型补电机器人：灰色的大柜子，窗里坐着一只黄色小怪，那就是它的大电池充电器。',
+      origin:'Charlie 设计。头顶两根黄电缆顶着红色电池板，手臂举着一个冒蓝色电的充电盘，一根彩虹电线从小怪身上一直通到盘里。',
+      habits:'自己不会攻击。它跟在机器人后面，挨着的时候给机器人充电（回血），同时只能给一个充。先打掉它，TB-37 就没人修了。',
+      traits:['Charlie 原创角色','解锁条件：通关 8 关','不会攻击','挨着机器人时给它充电','血厚、护甲和魔抗都高'] },
+    seaS:{
+      intro:'小海魔：蓝色圆顶头上长着一圈黑刺，下面是红色的小触手。',
+      origin:'Charlie 设计。它和海之魔是一家。',
+      habits:'抓住一个士兵后 2 秒，就会和那个士兵一起变成一只海之魔！在这 2 秒里把它打死，它就变不成了。',
+      traits:['Charlie 原创角色','解锁条件：通关 5 关','抓住士兵 2 秒后变成海之魔','血很少，快点打死它'] },
+    seaD:{
+      intro:'海之魔：蓝色的高头、一对大羊角、六只眼睛和一张满是尖牙的大嘴，下面是一团带刺的红触手。',
+      origin:'Charlie 设计。小海魔抓住士兵后会变成它；它也能在陆地上走。',
+      habits:'把触手上的尖刺扔向远处的士兵，扔完尖刺会慢慢长回来；近身时用触手打。',
+      traits:['Charlie 原创角色','解锁条件：通关 9 关（或由小海魔变来）','扔尖刺远程攻击','血厚 · 漏过去扣 2 条命'] },
+    slime:{
+      intro:'黏液怪：一大团亮绿色的黏液，三只小眼睛，两条手臂像两座拱桥。',
+      origin:'Charlie 设计。身体里隐约能看到骷髅、小手、箭和剑——只是看起来吓人，它并不吞士兵。',
+      habits:'护甲无限，只有魔法能打伤它；攻击无限，慢慢地一下打死一个士兵。走过的地方留下一道黏液（不会让士兵变慢）。',
+      traits:['Charlie 原创角色','解锁条件：通关 14 关','护甲 ∞：只有魔法塔有效','一下打死士兵 · 走得慢','漏过去扣 5 条命'] },
   }
 };
 /* ---- Codex · English lore ---- */
@@ -1031,6 +1147,50 @@ const CODEX_EN={
       origin:'Designed by Charlie. Its grey shoulder boxes have three bolt holes, red hooked spikes run down its arms, and black poison is always dripping beneath it.',
       habits:'Arrows, cannonballs, fire and soldiers cannot hurt it; only magic gets through. It walks very slowly, leaves puddles of poison and spits poison at nearby soldiers. Soldiers cannot damage it, but they can still hold it back.',
       traits:['Original character by Charlie','Unlocks after 8 missions','Infinite armour: only magic towers work','Poison hurts soldiers · very slow','Costs 5 lives if it gets through'] },
+    ship:{ intro:'Spaceship: a round grey ship with three flaming cannons on top and its pilot in a blue cockpit underneath.',
+      origin:'Designed by Charlie. Eight more small guns cover the hull. Spaceship, Half Spaceship and Flyer Monster are one story: each time it is blown up it loses half, until the pilot jumps out.',
+      habits:'It flies, so only anti-air towers can hit it and soldiers cannot block it. It shells nearby soldiers, and the blast also hurts nearby monsters for 25%. It slows down while firing, and the less health it has the slower it flies. When destroyed it becomes a Half Spaceship at full health.',
+      traits:['Original character by Charlie','Unlocks after 10 missions','Flying · shells soldiers','Destroyed → Half Spaceship → Flyer Monster','Costs 4 lives if it gets through'] },
+    halfship:{ intro:'Half Spaceship: a spaceship with half of it blown away, its jagged edge burnt and its lid hanging off.',
+      origin:'Designed by Charlie. The big cannons are gone and only a few small guns remain; the pilot is still in the cracked cockpit.',
+      habits:'Starts again at full health and keeps flying and shelling soldiers; the less health it has, the slower it goes. Blow it up again and the pilot jumps out.',
+      traits:['Original character by Charlie','Appears when a Spaceship is destroyed','Flying · shells soldiers','Destroyed → Flyer Monster','Costs 3 lives if it gets through'] },
+    pilot:{ intro:'Flyer Monster: the spaceship pilot, a chubby orange monster with a headset and a big white belly.',
+      origin:'Designed by Charlie. The headset is just for looks. It jumps out when the Half Spaceship is destroyed and walks the rest of the way.',
+      habits:'It cannot attack or fly; it just plods along slowly, but it is tough and well armoured.',
+      traits:['Original character by Charlie','Appears when a Half Spaceship is destroyed','No attack · slow','Tough','Costs 2 lives if it gets through'] },
+    dragon:{ intro:'Fire Dragon: a long dragon fading from red to orange to yellow, with red-and-black striped wings and eight legs.',
+      origin:'Designed by Charlie. Its long yellow snout looks like a crocodile’s, flames ring its neck, and its curled tail ends in a claw.',
+      habits:'Fast, and it can fly for a short while before landing. Fire towers cannot hurt it at all, and frost towers deal 2.5 times damage. When blocked it breathes fire, setting soldiers alight.',
+      traits:['Original character by Charlie','Unlocks after 9 missions','Fire towers useless · frost towers ×2.5','Flies a bit','Fire breath burns soldiers'] },
+    ghost3:{ intro:'Three-head Ghost: the avatar of a dark wizard, with three horned skulls on three long necks.',
+      origin:'Designed by Charlie. A white fox face sits on its chest, its purple tail ends in a little head, and its lower body stands in a pool of lava.',
+      habits:'It leaves lava wherever it goes; the lava burns soldiers only and takes about 6 seconds to cool. Its heads can be knocked off one by one, and each lost head weakens its attack.',
+      traits:['Original character by Charlie','Unlocks after 11 missions','Very high HP (three heads) · high magic resist','Fewer heads, weaker attack','Lava burns soldiers · costs 2 lives'] },
+    rockz:{ intro:'Rock Zombie: a cracked stone zombie with a big hammer in one hand and a long curved blade in the other.',
+      origin:'Designed by Charlie. It serves the Rock Giant but often turns up on its own. Two little horns with yellow tips sit on its head.',
+      habits:'Infinite attack: it swings slowly, but one hit kills a soldier. It can also suck away three soldiers’ armour and weapons: those soldiers lose all defence and their barracks’ weapon supply drops to zero until you repair it. It does not get stronger. When it dies it breaks into big chunks of rock.',
+      traits:['Original character by Charlie','Unlocks after 13 missions','Kills a soldier in one hit · slow attack','Drains three soldiers’ armour and supplies','Tough, high armour and magic resist · costs 5 lives'] },
+    wood:{ intro:'Wood Monster: a huge tree stump wrapped in leaves, with growth rings on its face and ring-shaped eyes.',
+      origin:'Designed by Charlie. It has two long branch arms with leafy hands and two clumps of dark brown roots.',
+      habits:'Infinite armour: arrows, cannonballs and soldiers cannot hurt it. Magic works, and fire can burn it but only for limited damage (40%). It swings its branch arms and kills a soldier in one hit.',
+      traits:['Original character by Charlie','Unlocks after 12 missions','Infinite armour: magic works, fire towers do 40%','Kills a soldier in one hit','Costs 3 lives if it gets through'] },
+    charger:{ intro:'Big Charger Robot: a big grey cabinet with a little yellow creature in its window: its giant battery charger.',
+      origin:'Designed by Charlie. Two yellow cables hold red battery panels above its head, its arm lifts a charging dish crackling with blue electricity, and a rainbow cable runs from the creature to the dish.',
+      habits:'It never attacks. It follows robots and charges (heals) one at a time while right next to them. Take it out first and the TB-37 has no one to repair it.',
+      traits:['Original character by Charlie','Unlocks after 8 missions','No attack','Charges a robot when right next to it','Tough, high armour and magic resist'] },
+    seaS:{ intro:'Small Sea Demon: a little spiky blue dome with red tentacles underneath.',
+      origin:'Designed by Charlie. It is family with the Demon of the Seas.',
+      habits:'Two seconds after it catches a soldier, it and the soldier turn into a Demon of the Seas! Kill it within those two seconds and the change never happens.',
+      traits:['Original character by Charlie','Unlocks after 5 missions','Turns into a Demon of the Seas 2 s after catching a soldier','Very low HP: kill it fast'] },
+    seaD:{ intro:'Demon of the Seas: a tall blue head with ram horns, six eyes and a huge toothy mouth, on a mass of spiky red tentacles.',
+      origin:'Designed by Charlie. A Small Sea Demon becomes one after catching a soldier, and it walks on land too.',
+      habits:'It throws the spikes from its tentacles at soldiers further away; the spikes grow back afterwards. Up close it lashes with its tentacles.',
+      traits:['Original character by Charlie','Unlocks after 9 missions (or from a Small Sea Demon)','Throws spikes','Tough · costs 2 lives'] },
+    slime:{ intro:'Slime Monster: a huge bright-green slime with three little eyes and two arms arching like bridges.',
+      origin:'Designed by Charlie. Skulls, little hands, arrows and a sword float inside it, but it only looks scary: it does not swallow soldiers.',
+      habits:'Infinite armour, so only magic can hurt it; infinite attack, so it slowly kills a soldier with each hit. It leaves a trail of slime behind (which does not slow soldiers).',
+      traits:['Original character by Charlie','Unlocks after 14 missions','Infinite armour: only magic towers work','Kills a soldier in one hit · slow','Costs 5 lives if it gets through'] },
   },
 };
 // 一句话用于列表预览（占位常量，便于代码读取）
@@ -1038,7 +1198,7 @@ const CODEX_LIST_NAMES={ arrow:'箭塔系（→ 狙击塔）', mage:'法师塔�
 const CODEX_ENEMY_NAMES={
   grunt:'小兵', runner:'奔行者', armor:'重甲兵', flyer:'飞行兵', boss:'魔王',
   bossEarth:'山岳之主', bossSpace:'虚空主宰', bossHell:'熔狱魔神',
-  biter:'撕咬虫', speeder:'巨蛇', tanker:'盾兵长', swamp:'沼泽怪', rainbow:'彩虹巨人', clown:'小丑怪', doctor:'怪物博士', tb37:'TB-37 机器人',
+  biter:'撕咬虫', speeder:'巨蛇', tanker:'盾兵长', swamp:'沼泽怪', rainbow:'彩虹巨人', clown:'小丑怪', doctor:'怪物博士', tb37:'TB-37 机器人', ship:'飞船', halfship:'半飞船', pilot:'操控怪', dragon:'火焰龙', ghost3:'三头鬼', rockz:'石尸', wood:'木兽', charger:'大型补电机器人', seaS:'小海魔', seaD:'海之魔', slime:'黏液怪',
 };
 
 /* ---------- 路径与建造位 ---------- */
@@ -1299,12 +1459,13 @@ function spriteArt(g,e){
   const B=SPRITES[e.def.sprite]; if(!B) return false;
   if(e.x===undefined){ CharSprites.draw(g,B,'idle',performance.now()/1000,e.r*2.9,{mode:'icon'}); return true; }
   // 一次性动作（吐毒、加血）优先；飞在天上用 fly；被拦住用 attack
-  const anim = e.dieT!=null ? 'die' : (e.act && B.anims[e.act]) ? e.act : ((e.alt||0)>0.5 && B.anims.fly) ? 'fly' : (e.blocker ? 'attack' : 'walk');
+  let anim = e.dieT!=null ? 'die' : (e.act && B.anims[e.act]) ? e.act : ((e.alt||0)>0.5 && B.anims.fly) ? 'fly' : (e.blocker ? 'attack' : 'walk');
+  if(e.heads && e.heads<3 && B.anims[anim+e.heads]) anim+=e.heads;      // 三头鬼：按剩下几个头选动画
   if(e.alt>0.02 && e.dieT==null){ g.fillStyle='rgba(0,0,0,'+(0.25*e.alt).toFixed(2)+')';   // 飞起来时地上的影子
     g.beginPath(); g.ellipse(0,e.r*0.8,e.r*1.3,e.r*0.35,0,0,7); g.fill(); }
   g.translate(0,e.r*0.8-(e.alt||0)*FLY_H);             // 脚底略低于路径中心，身体落在路上；飞行时抬高
-  CharSprites.draw(g,B,anim, e.dieT!=null ? e.dieT : anim===e.act ? e.actT : (e.animT||0), B.def.gameH||e.r*3,
-    {flip:e.face<0, flash:(e.hitT||0)/0.12});
+  CharSprites.draw(g,B,anim, e.dieT!=null ? e.dieT : (e.act && anim===e.act) ? e.actT : (e.animT||0), B.def.gameH||e.r*3,
+    {flip:(B.def.faceLeft?e.face>0:e.face<0), flash:(e.hitT||0)/0.12});
   return true;
 }
 function enemyArt(g,e){
@@ -1503,6 +1664,12 @@ class Enemy{
     if(d.flier){ this.air=true; this.alt=1; this.flyT=d.flier.air*(0.8+Math.random()*0.4); }   // 小丑怪：飞着出场
     if(d.poison){ this.spitCD=2+Math.random()*2; this.dripCD=2+Math.random()*2; }
     if(d.healer){ this.healCD=0.8+Math.random(); this.shotCD=1+Math.random(); }
+    if(d.gun){ this.gunCD=1+Math.random(); this.slowShotT=0; }
+    if(d.heads){ this.heads=d.heads; }
+    if(d.lava){ this.lavaT=0; }
+    if(d.sucker){ this.suckLeft=d.sucker; this.suckCD=1; }
+    if(d.spikes){ this.spikeCD=1+Math.random(); }
+    if(d.slimeTrail){ this.slimeT=0; }
   }
   // 小丑怪：飞 3~4 秒，落地歇一会儿，再起飞（起飞时挣脱拦截的士兵）
   _fly(dt){ const F=this.def.flier; this.flyT-=dt;
@@ -1533,9 +1700,51 @@ class Enemy{
     this.healCD=HEAL_CD; this.act='heal'; this.actT=0;
     const D=CHARS[this.def.sprite], [ex,ey]=this._tubePt(D&&D.healPt);
     G.heals.push({x:ex,y:ey,tgt:best,amt:Math.max(8,Math.round(best.maxhp*HEAL_FRAC)),t:0}); }
+  // 飞船 / 半飞船：朝附近的士兵开炮；炮弹炸开时附近的自己人也挨 25%
+  _gun(dt){ if(this.x===undefined) return; const Gn=this.def.gun;
+    if(this.slowShotT>0) this.slowShotT-=dt;
+    this.gunCD-=dt; if(this.gunCD>0) return;
+    let best=null,bd=Gn.range;
+    for(const t of G.towers){ if(t.kind!=='weapon') continue;
+      for(const s of t.soldiers){ if(s.dead) continue; const d=dist(this.x,this.y,s.x,s.y); if(d<bd){ bd=d; best=s; } } }
+    if(!best){ this.gunCD=0.4; return; }
+    this.gunCD=Gn.cd; this.act='shoot'; this.actT=0; if(this.def.shootSlow) this.slowShotT=0.5;
+    const D=CHARS[this.def.sprite], [ex,ey]=this._tubePt(D&&D.gunPt);
+    G.globs.push({kind:'shell',x0:ex,y0:ey,x:best.x,y:best.y,t:0,T:0.3,dmg:Gn.dmg,src:this}); }
+  // 石尸：吸走附近士兵的盔甲和补给（一共三个）：士兵防御变 0，所在兵营的武器补给变 0
+  _suck(dt){ if(this.x===undefined || this.suckLeft<=0) return; this.suckCD-=dt; if(this.suckCD>0) return;
+    let best=null,bd=80;
+    for(const t of G.towers){ if(t.kind!=='weapon') continue;
+      for(const s of t.soldiers){ if(s.dead||s.drained) continue; const d=dist(this.x,this.y,s.x,s.y); if(d<bd){ bd=d; best=s; } } }
+    if(!best){ this.suckCD=0.4; return; }
+    best.drained=true; best.b.wp=0; this.suckLeft--; this.suckCD=1.5;
+    if(window.Fx){ Fx.zap(best.x,best.y,this.x,this.y-this.r,'200,200,190'); Fx.text(best.x,best.y-14,LANG==='en'?'Disarmed!':'被吸走装备！','230,230,220'); }
+    if(!G.suckHint){ G.suckHint=1; flash(LANG==='en'?'The Rock Zombie sucked away a soldier’s armour and weapons! Repair the barracks.':'石尸吸走了士兵的盔甲和武器！快给兵营修武器。'); } }
+  // 大型补电机器人：挨着一个机器人时给它充电（同时只能充一个）
+  _charge(dt){ if(this.x===undefined) return; this.chargeTgt=null; const C=this.def.charger;
+    let best=null,bd=C.range;
+    for(const e of G.enemies){ if(e===this||e.dead||e.leaked||e.x===undefined||!e.def.robot||e.hp>=e.maxhp) continue;
+      const d=dist(this.x,this.y,e.x,e.y); if(d<bd){ bd=d; best=e; } }
+    if(!best) return; this.chargeTgt=best; best.hp=Math.min(best.maxhp,best.hp+C.hps*dt);
+    if(!this.act){ this.act='charge'; this.actT=0; } }
+  // 海之魔：把触手上的尖刺扔向士兵（扔完会长回来）
+  _spikes(dt){ if(this.x===undefined) return; const K=this.def.spikes; this.spikeCD-=dt; if(this.spikeCD>0 || this.act) return;
+    let best=null,bd=K.range;
+    for(const t of G.towers){ if(t.kind!=='weapon') continue;
+      for(const s of t.soldiers){ if(s.dead) continue; const d=dist(this.x,this.y,s.x,s.y); if(d<bd){ bd=d; best=s; } } }
+    if(!best){ this.spikeCD=0.4; return; }
+    this.spikeCD=K.cd; this.act='throw'; this.actT=0;
+    G.globs.push({kind:'spike',x0:this.x,y0:this.y-this.r*0.6,x:best.x,y:best.y,t:-0.35,T:0.3,dmg:K.dmg}); }
+  // 三头鬼：脚下留熔岩
+  _lava(dt){ if(this.x===undefined) return; this.lavaT-=dt; if(this.lavaT>0) return; this.lavaT=LAVA_EVERY;
+    G.poison.push({kind:'lava',x:this.x+(Math.random()-0.5)*6,y:this.y+this.r*0.6,r:15,life:LAVA_LIFE,max:LAVA_LIFE,dps:LAVA_DPS}); }
+  // 移动速度：血越少越慢、开炮时变慢
+  spdMul(){ let k=1; const d=this.def;
+    if(d.hpSlow) k*=d.hpSlow+(1-d.hpSlow)*Math.max(0,this.hp/this.maxhp);
+    if(this.slowShotT>0) k*=0.5; return k; }
   // 管口在场上的位置（按精灵的缩放和朝向换算）
   _tubePt(pt){ const D=CHARS[this.def.sprite], sc=D?D.gameH/D.viewBox[3]:0, p=pt||[0,0];
-    return [this.x+(p[0]-(D?D.foot[0]:0))*sc*(this.face<0?-1:1), this.y+this.r*0.8+(p[1]-(D?D.foot[1]:0))*sc]; }
+    return [this.x+(p[0]-(D?D.foot[0]:0))*sc*((D&&D.faceLeft?this.face>0:this.face<0)?-1:1), this.y+this.r*0.8+(p[1]-(D?D.foot[1]:0))*sc]; }
   // 怪物博士：背包左边的攻击管，朝附近的士兵射一个紫色小球
   _shoot(dt){ if(this.x===undefined) return;
     this.shotCD-=dt; if(this.shotCD>0 || this.act) return;
@@ -1556,6 +1765,27 @@ class Enemy{
     if(this.def.flier) this._fly(dt);
     if(this.def.poison) this._poison(dt);
     if(this.def.healer){ this._heal(dt); this._shoot(dt); }
+    if(this.def.gun) this._gun(dt);
+    if(this.def.lava) this._lava(dt);
+    if(this.def.sucker) this._suck(dt);
+    if(this.def.charger) this._charge(dt);
+    if(this.def.spikes) this._spikes(dt);
+    if(this.def.slimeTrail && this.x!==undefined && !this.blocker){ this.slimeT-=dt;     // 黏液怪：走过的地方留下黏液（不影响士兵）
+      if(this.slimeT<=0){ this.slimeT=0.45; G.poison.push({kind:'slime',x:this.x+(Math.random()-0.5)*8,y:this.y+this.r*0.6,r:16,life:4,max:4,dps:0}); } }
+    // 小海魔：抓住士兵后 2 秒，和士兵一起变成海之魔；这 2 秒里打死它就不会变
+    if(this.def.morph){
+      if(this.morphT==null && this.blocker && !this.blocker.dead){ this.morphT=0; this.morphSol=this.blocker; }
+      if(this.morphT!=null){ this.morphT+=dt; this.act='morph'; this.actT=this.morphT;
+        if(this.morphT>=this.def.morph.t){
+          const n=new Enemy(this.def.morph.into,this.hpMul||1); n.route=this.route; n.dist=this.dist; n.lane0=this.lane0; n.x=this.x; n.y=this.y; n.face=this.face;
+          G.pendingEnemies.push(n); triggerIntroIfNew(this.def.morph.into);
+          const s=this.morphSol; if(s && !s.dead) hurtSoldier(s,1e6);
+          if(window.Fx) Fx.explosion(this.x,this.y-this.r,24,false);
+          this.morphed=true; this.dead=true; return; }
+        return; } }
+    if(this.def.heads){ const h=Math.max(1,Math.ceil(this.def.heads*this.hp/this.maxhp-1e-6));
+      if(h<this.heads){ this.heads=h; if(window.Fx && this.x!==undefined){ Fx.death(this.x+(h===2?12:-12),this.y-this.r*3,'#e8e4dc',8,false); }
+        flash(LANG==='en'?'A head of the Three-head Ghost was knocked off!':'三头鬼被打掉了一个头！'); } }
     // Boss：定时召唤帮手 + 概率短距离穿越
     if(this.type==='boss'){
       // 召唤与穿越：即使正被士兵拦住也能发动
@@ -1580,7 +1810,9 @@ class Enemy{
     if(this.blocker && !this.blocker.dead) return;        // 被士兵拦住，不前进
     if(this.blocker && this.blocker.dead) this.blocker=null;
     const d0=this.dist;
-    this.dist+=this.speed*this.slowF*timeDil(this.x,this.y,0.5)*dt;
+    this.dist+=this.speed*this.slowF*this.spdMul()*timeDil(this.x,this.y,0.5)*dt;
+    if(this.def.charger){ for(const e of G.enemies){ if(e===this||e.dead||!e.def.robot||e.def.charger||e.route!==this.route) continue;   // 跟在机器人后面
+      if(e.dist>d0-4 && e.dist-this.dist<26) this.dist=Math.max(d0,Math.min(this.dist,e.dist-22)); } }
     // 虫洞开启时：走过入口的敌人瞬间出现在出口（可能换到另一条路线）
     for(const w of G.worms){ if(!w.isOpen || this.route!==G.routes[w.ra] || d0>=w.da || this.dist<w.da) continue;
       this.route=G.routes[w.rb]; this.dist=w.db+(this.dist-w.da);
@@ -1594,9 +1826,14 @@ class Enemy{
     this.x=p.x+nx*lane; this.y=p.y+ny*lane;
     if(p.done) this.leaked=true;
   }
-  hit(dmg,type){
+  hit(dmg,type,S){
+    if(S && this.def.fireImmune && S.burn){                // 火焰龙：火焰塔完全打不动
+      if(this.x!==undefined && G && !G.fireHint){ G.fireHint=1; flash(LANG==='en'?'Fire cannot hurt the Fire Dragon!':'火焰伤不到火焰龙！'); }
+      return; }
+    if(S && this.def.frostWeak && S.slow) dmg*=this.def.frostWeak;   // 冰霜塔对火焰龙 2.5 倍
     // 重甲兵在攻击士兵时盾会放下，护甲失效
     let arm=this.armor;
+    if(S && this.def.fireOk && S.burn){ dmg*=this.def.fireOk; this.hp-=dmg; this.hitT=0.12; if(this.hp<=0&&!this.dead) this.dead=true; return; }   // 木兽：火能烧，但伤害有限
     if(this.def.physImmune && type!=='magic'){          // TB-37：护甲 ∞，只有魔法打得动
       if(this.x!==undefined){ if(window.Fx) Fx.clink(this.x,this.y-this.r*0.6); sfx('clink',{x:this.x});
         if(G && !G.immuneHint){ G.immuneHint=1; flash(LANG==='en'?'TB-37 has infinite armour: only magic can hurt it!':'TB-37 护甲无限：只有魔法能打伤它！'); } }
@@ -1609,7 +1846,7 @@ class Enemy{
 class Soldier{
   constructor(b){ this.b=b; this.maxhp=b.S.sHp; this.hp=this.maxhp; this.dmg=b.S.sDmg;
     this.x=b.x; this.y=b.y; this.dead=false; this.target=null; }
-  reset(){ this.hp=this.maxhp; this.dead=false; this.x=this.b.x; this.y=this.b.y; this.target=null; }
+  reset(){ this.hp=this.maxhp; this.dead=false; this.burnT=0; this.drained=false; this.x=this.b.x; this.y=this.b.y; this.target=null; }
 }
 // 士兵受到非近战伤害（毒液等）：死了就进重生队列
 function hurtSoldier(s,d){ if(s.dead) return; s.hp-=d;
@@ -1686,7 +1923,11 @@ class Tower{
         const broken=this.wp<=0;
         if(!s.target.def.physImmune) s.target.hp -= (broken? s.dmg*0.15 : s.dmg) * dt;   // 打不动 TB-37，只能拦住它
         if(s.target.hp<=0){ s.target.dead=true; s.target.blocker=null; s.target=null; }
-        else { const inc=Math.max(1, s.target.def.mdmg-(S.armor||0));
+        else { const T0=s.target, md=T0.def.mdmg*(T0.heads?T0.heads/T0.def.heads:1);   // 三头鬼：头越少攻击越弱
+          if(T0.def.burnsSoldiers) s.burnT=SOLDIER_BURN_T;                                // 火焰龙喷火：士兵会烧一会儿
+          let inc=md>0?Math.max(1, md-(s.drained?0:(S.armor||0))):0;
+          if(T0.def.oneShot){ inc=0; T0.swingT=(T0.swingT||0)+dt;                      // 攻击 ∞：慢慢挥，一下打死
+            if(T0.swingT>=T0.def.oneShot){ T0.swingT=0; s.hp=0; if(window.Fx) Fx.clink(s.x,s.y-4); } }
           s.hp -= inc*dt;                                   // 骑士堡护甲减伤
           if(thorns && !s.target.def.physImmune){ s.target.hp -= inc*0.6*dt;            // 荆棘反伤
             if(s.target.hp<=0){ s.target.dead=true; s.target.blocker=null; s.target=null; } }
@@ -1721,15 +1962,15 @@ class Shot{
     let splash=S.splash;
     if(splash>0 && P.hasPerk('bigblast')) splash=Math.round(splash*1.45);
     if(splash>0){ for(const e of G.enemies){ if(e.dead||e.leaked) continue;
-        if(dist(this.tgt.x,this.tgt.y,e.x,e.y)<=splash){ e.hit(this.dmg,S.type);
-          if(S.burn && !e.dead && !e.def.physImmune){ e.burnT=S.burnT; e.burnDmg=S.burn; } } }
+        if(dist(this.tgt.x,this.tgt.y,e.x,e.y)<=splash){ e.hit(this.dmg,S.type,S);
+          if(S.burn && !e.dead && (!e.def.physImmune || e.def.fireOk) && !e.def.fireImmune){ e.burnT=S.burnT; e.burnDmg=S.burn*(e.def.fireOk||1); } } }
       if(window.Fx) Fx.explosion(this.tgt.x,this.tgt.y,splash,!!S.burn);
       sfx(S.burn?'fireboom':'boom',{x:this.tgt.x});
       if(P.hasPerk('napalm')) G.zones.push({x:this.tgt.x,y:this.tgt.y,r:splash*0.9,life:4,max:4,dps:(S.burn||10)}); }
     else {
       let dmg=this.dmg;
       if(P.hasPerk('shatter') && this.tgt.slowF<1) dmg=Math.round(dmg*1.4);
-      this.tgt.hit(dmg,S.type);
+      this.tgt.hit(dmg,S.type,S);
       const hk = this.key==='mage' ? (S.slow?'frost':'magic') : (this.tier>=3?'sniper':'arrow');
       if(window.Fx){ Fx.hit(hk,this.tgt.x,this.tgt.y); if(this.crit) Fx.text(this.tgt.x,this.tgt.y-this.tgt.r-12,LANG==='en'?'CRIT!':'暴击!','255,90,70'); }
       sfx(hk==='frost'?'hitFrost':hk==='magic'?'hitMagic':'hitArrow',{x:this.tgt.x});
@@ -1738,7 +1979,7 @@ class Shot{
         for(const e of G.enemies){ if(e===this.tgt||e.dead||e.leaked) continue;
           if(e.air&&!S.air) continue;
           const dd=dist(this.tgt.x,this.tgt.y,e.x,e.y); if(dd<=70&&dd<bd){bd=dd;n=e;} }
-        if(n){ n.hit(Math.round(this.dmg*0.6),S.type); if(window.Fx) Fx.zap(this.tgt.x,this.tgt.y,n.x,n.y,'220,235,255'); } }
+        if(n){ n.hit(Math.round(this.dmg*0.6),S.type,S); if(window.Fx) Fx.zap(this.tgt.x,this.tgt.y,n.x,n.y,'220,235,255'); } }
       if(P.hasPerk('chain')){ let n=null,bd=1e9;
         for(const e of G.enemies){ if(e===this.tgt||e.dead||e.leaked) continue;
           const dd=dist(this.tgt.x,this.tgt.y,e.x,e.y); if(dd<=120&&dd<bd){bd=dd;n=e;} }
@@ -1889,7 +2130,7 @@ function step(dt){
     triggerIntroIfNew(s.type);   // 首次出场敌人 → 暂停弹介绍卡
   }
   // 胜负：所有波已排程 + 出完 + 没活敌人 = 胜利
-  if(G.started && G.phase!=='done' && G.waveIdx>=G.totalWaves && G.spawnList.length===0 && G.enemies.length===0){
+  if(G.started && G.phase!=='done' && G.waveIdx>=G.totalWaves && G.spawnList.length===0 && G.enemies.length===0 && G.pendingEnemies.length===0){
     endGame(true); return;
   }
   updateWaveBtn();
@@ -1904,17 +2145,24 @@ function step(dt){
   // 燃烧地带（燃油弹特性）
   for(const z of G.zones){ z.life-=dt;
     for(const e of G.enemies){ if(e.dead||e.leaked) continue;
-      if(!e.def.physImmune && dist(z.x,z.y,e.x,e.y)<=z.r){ e.hp-=z.dps*dt; if(e.hp<=0) e.dead=true; } }
+      if((!e.def.physImmune || e.def.fireOk) && !e.def.fireImmune && dist(z.x,z.y,e.x,e.y)<=z.r){ e.hp-=z.dps*(e.def.fireOk||1)*dt; if(e.hp<=0) e.dead=true; } }
     if(window.Fx && Math.random()<dt*8){ const a=Math.random()*6.28, r=Math.random()*z.r*0.8; Fx.burn(z.x+Math.cos(a)*r,z.y+Math.sin(a)*r*0.8); } }
   // TB-37 的毒液：地上的毒水坑伤士兵；吐出去的毒团落地后砸伤附近士兵并留下毒水坑
   for(const z of G.poison){ z.life-=dt;
     for(const t of G.towers){ if(t.kind!=='weapon') continue;
-      for(const s of t.soldiers) if(!s.dead && dist(z.x,z.y,s.x,s.y)<=z.r) hurtSoldier(s,POISON_DPS*dt); } }
+      for(const s of t.soldiers) if(!s.dead && dist(z.x,z.y,s.x,s.y)<=z.r) { const dps=z.dps??POISON_DPS; if(dps>0) hurtSoldier(s,dps*dt); } } }
+  // 着火的士兵（火焰龙喷的）
+  for(const t of G.towers){ if(t.kind!=='weapon') continue;
+    for(const s of t.soldiers) if(!s.dead && s.burnT>0){ s.burnT-=dt; hurtSoldier(s,SOLDIER_BURN*dt);
+      if(window.Fx && Math.random()<dt*10) Fx.burn(s.x,s.y-4); } }
   for(const b of G.globs){ b.t+=dt;
     if(b.t>=b.T && !b.done){ b.done=true;
       for(const t of G.towers){ if(t.kind!=='weapon') continue;
-        for(const s of t.soldiers) if(!s.dead && dist(b.x,b.y,s.x,s.y)<=(b.kind==='bolt'?12:16)) hurtSoldier(s,b.dmg||POISON_HIT); }
-      if(b.kind!=='bolt') G.poison.push({x:b.x,y:b.y,r:POISON_R,life:POISON_LIFE,max:POISON_LIFE});
+        for(const s of t.soldiers) if(!s.dead && dist(b.x,b.y,s.x,s.y)<=(b.kind==='bolt'||b.kind==='spike'?12:b.kind==='shell'?18:16)) hurtSoldier(s,b.dmg||POISON_HIT); }
+      if(b.kind==='shell'){ for(const e of G.enemies){ if(e.dead||e.leaked||e.x===undefined||e===b.src) continue;   // 炸到附近的自己人：25%
+          if(dist(b.x,b.y,e.x,e.y)<=18){ e.hp-=b.dmg*SHELL_FF; if(e.hp<=0) e.dead=true; } }
+        if(window.Fx) Fx.explosion(b.x,b.y,14,false); sfx('boom',{x:b.x}); }
+      if(b.kind!=='bolt' && b.kind!=='shell' && b.kind!=='spike') G.poison.push({x:b.x,y:b.y,r:POISON_R,life:POISON_LIFE,max:POISON_LIFE});
       if(window.Fx) Fx.hit('magic',b.x,b.y); } }
   // 怪物博士的加血小球
   for(const h of G.heals){ h.t+=dt; const T=h.tgt;
@@ -1933,7 +2181,12 @@ function step(dt){
     if(s.target&&(s.target.dead||s.target.leaked)){ if(s.target.blocker===s)s.target.blocker=null; s.target=null; } }
   for(const e of G.enemies) if(e.dead && !e.leaked && e.x!==undefined){
     const boss=e.type.startsWith('boss');
-    if(e.def.sprite) G.corpses.push({ def:e.def, r:e.r, x:e.x, y:e.y, face:e.face, dieT:0 });
+    if(e.morphed){}                                           // 小海魔变身了，不是死亡
+    else if(e.def.next){                                           // 飞船 → 半飞船 → 操控怪：满血接着走
+      const n=new Enemy(e.def.next,e.hpMul||1); n.route=e.route; n.dist=e.dist; n.lane0=e.lane0; n.x=e.x; n.y=e.y; n.face=e.face;
+      G.pendingEnemies.push(n); triggerIntroIfNew(e.def.next);
+      if(window.Fx) Fx.explosion(e.x,e.y-e.r,26,true); }
+    else if(e.def.sprite) G.corpses.push({ def:e.def, r:e.r, x:e.x, y:e.y, face:e.face, dieT:0 });
     if(window.Fx) Fx.death(e.x,e.y,e.def.color,e.r,boss);
     sfx(boss?'bossDie':'die',{x:e.x, big:e.r>=16}); }
   for(const c of G.corpses) c.dieT+=dt;
@@ -2035,7 +2288,9 @@ function draw(){
   for(const z of G.poison){ const a=Math.min(1,z.life/z.max, (z.max-z.life)*4+0.2);
     ctx.save(); ctx.translate(z.x,z.y); ctx.scale(1,0.45);
     const pg=ctx.createRadialGradient(-z.r*0.2,-z.r*0.2,1,0,0,z.r);
-    pg.addColorStop(0,'rgba(70,92,48,'+(0.85*a)+')'); pg.addColorStop(0.7,'rgba(22,30,16,'+(0.8*a)+')'); pg.addColorStop(1,'rgba(10,14,8,0)');
+    if(z.kind==='slime'){ pg.addColorStop(0,'rgba(150,230,80,'+(0.75*a)+')'); pg.addColorStop(0.7,'rgba(90,190,40,'+(0.6*a)+')'); pg.addColorStop(1,'rgba(60,150,30,0)'); }
+    else if(z.kind==='lava'){ pg.addColorStop(0,'rgba(255,224,102,'+(0.9*a)+')'); pg.addColorStop(0.45,'rgba(255,110,26,'+(0.85*a)+')'); pg.addColorStop(1,'rgba(200,26,16,0)'); }
+    else { pg.addColorStop(0,'rgba(70,92,48,'+(0.85*a)+')'); pg.addColorStop(0.7,'rgba(22,30,16,'+(0.8*a)+')'); pg.addColorStop(1,'rgba(10,14,8,0)'); }
     ctx.fillStyle=pg; ctx.beginPath(); ctx.arc(0,0,z.r,0,7); ctx.fill();
     ctx.fillStyle='rgba(170,200,120,'+(0.35*a)+')'; ctx.beginPath(); ctx.arc(-z.r*0.3,-z.r*0.3,z.r*0.18,0,7); ctx.fill();
     ctx.restore(); }
@@ -2053,11 +2308,20 @@ function draw(){
   // 子弹/爆炸
   for(const s of G.shots) drawShot(s);
   for(const b of G.globs){ if(b.t<0) continue; const k=Math.min(1,b.t/b.T), x=b.x0+(b.x-b.x0)*k, y=b.y0+(b.y-b.y0)*k-Math.sin(k*Math.PI)*(b.kind==='bolt'?10:30);
+    if(b.kind==='spike'){ const ang=Math.atan2(b.y-b.y0,b.x-b.x0); ctx.save(); ctx.translate(x,y); ctx.rotate(ang);
+      ctx.fillStyle='#2a2228'; ctx.beginPath(); ctx.moveTo(7,0); ctx.lineTo(-5,-3); ctx.lineTo(-5,3); ctx.closePath(); ctx.fill(); ctx.restore(); continue; }
+    if(b.kind==='shell'){ ctx.fillStyle='#2a2a2e'; ctx.beginPath(); ctx.arc(x,y,3.5,0,7); ctx.fill();
+      ctx.fillStyle='rgba(255,120,40,.8)'; ctx.beginPath(); ctx.arc(x-1,y-1,1.6,0,7); ctx.fill(); continue; }
     if(b.kind==='bolt'){ const bg=ctx.createRadialGradient(x,y,0,x,y,7); bg.addColorStop(0,'rgba(245,225,255,1)'); bg.addColorStop(0.4,'rgba(155,77,255,.95)'); bg.addColorStop(1,'rgba(155,77,255,0)');
       ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(x,y,7,0,7); ctx.fill(); continue; }
     ctx.fillStyle='#1d2614'; ctx.strokeStyle='#0a0d07'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.ellipse(x,y,5,4,k*3,0,7); ctx.fill(); ctx.stroke();
     ctx.fillStyle='rgba(160,190,110,.6)'; ctx.beginPath(); ctx.arc(x-1.5,y-1.5,1.3,0,7); ctx.fill(); }
+  for(const e of G.enemies){ const T2=e.chargeTgt; if(!T2||e.dead||T2.dead) continue;   // 补电机器人的电流
+    const D=CHARS[e.def.sprite], sc=D?D.gameH/D.viewBox[3]:0, cp=D&&D.chargePt||[0,0], fl=(D&&D.faceLeft?e.face>0:e.face<0)?-1:1;
+    const x0=e.x+(cp[0]-D.foot[0])*sc*fl, y0=e.y+e.r*0.8+(cp[1]-D.foot[1])*sc, x1=T2.x, y1=T2.y-T2.r;
+    ctx.strokeStyle='rgba(120,200,255,.9)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x0,y0);
+    for(let k=1;k<6;k++){ const t=k/6; ctx.lineTo(x0+(x1-x0)*t+(Math.random()-0.5)*6, y0+(y1-y0)*t+(Math.random()-0.5)*6); } ctx.lineTo(x1,y1); ctx.stroke(); }
   for(const h of G.heals){ const r=4+Math.sin(h.t*20)*0.8, hg=ctx.createRadialGradient(h.x,h.y,0,h.x,h.y,r*2.2);
     hg.addColorStop(0,'rgba(255,235,235,1)'); hg.addColorStop(0.35,'rgba(255,70,80,.95)'); hg.addColorStop(1,'rgba(255,70,80,0)');
     ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(h.x,h.y,r*2.2,0,7); ctx.fill(); }
@@ -2695,8 +2959,10 @@ function showCharDetail(kind,key){
       [EN?'HP':'血量',e.hp], [EN?'Speed':'移速',e.speed], [EN?'Armour':'护甲',e.armor], [EN?'Magic res.':'魔抗',e.mres||0],
       [EN?'Flying':'可飞行',e.flier?(EN?'Half the time':'一半时间'):e.air?(EN?'Yes':'是'):(EN?'No':'否')], [EN?'Melee DMG':'近战伤害（对士兵）', e.mdmg],
       ...(e.lives>1?[[EN?'Lives lost if it gets through':'漏过去扣命', e.lives]]:[]),
+      ...(e.next?[[EN?'When destroyed':'被打爆后', nmEnemy(e.next)]]:[]),
     ];
     if(e.physImmune) rows[2][1]='∞';
+    if(e.oneShot) rows[5][1]=EN?'∞ (kills a soldier in one hit)':'∞（一下打死士兵）';
     statsHTML=`<table><tbody>`+rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')+`</tbody></table>`;
   }
   det.innerHTML=`<div class="head">${icon}<div><div class="nm">${nm}</div><div class="role">${role}</div></div></div>

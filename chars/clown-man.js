@@ -49,20 +49,26 @@ function wing(P,s){
 
 function leg(P,i,s){
   // 粗腿：从身体底下伸出，黄蓝相间三节，带小刺；末端是大圆环脚
-  const [hx,hy]=HIPS[i], fx=hx+s*42, fy=168, n=3, R=rng(700+i);
+  const [hx,hy]=HIPS[i], fx=hx+s*42, fy=160, n=3, R=rng(700+i);
   const dx=(fx-hx)/n, dy=(fy-hy)/n, L=Math.hypot(dx,dy), nx=-dy/L, ny=dx/L; let segs='';
   for(let k=0;k<n;k++){ const ax=hx+dx*k, ay=hy+dy*k, w=13-k;
     const p=[[ax+nx*w,ay+ny*w],[ax+dx+nx*(w-1),ay+dy+ny*(w-1)],[ax+dx-nx*(w-1),ay+dy-ny*(w-1)],[ax-nx*w,ay-ny*w]];
     segs+=`<path d="${organic(p,1,710+i*10+k)}" fill="${k%2?BLUE:YEL}" stroke="${OUT}" stroke-width="1.8"/>`;
     for(const sd of [1,-1]){ const sx=ax+dx*0.5+nx*w*sd, sy=ay+dy*0.5+ny*w*sd, l=9+R()*5;
       segs+=`<path d="M${f1(sx-dx*0.18)},${f1(sy-dy*0.18)}L${f1(sx+nx*l*sd+dx*0.25)},${f1(sy+ny*l*sd+dy*0.25)}L${f1(sx+dx*0.18)},${f1(sy+dy*0.18)}Z" fill="${k%2?YEL:BLUE}" stroke="${OUT}" stroke-width="1.1"/>`; } }
-  const cx=fx+s*4, cy=fy+4;
+  // 青蛙一样的脚：脚掌 + 四根长趾，趾间有蹼，趾尖圆圆的吸盘
+  const cx=fx+s*2, cy=fy+6; let toes='', web=[[cx,cy-4]];
+  const angs=[-160,-125,-55,-20].map(a=>a*Math.PI/180*-1);
+  angs.forEach((a,k)=>{ const L=32+(k===1||k===2?8:0), ex=cx+Math.cos(a)*L, ey=cy+Math.sin(a)*L*0.22+12;
+    web.push([cx+Math.cos(a)*L*0.8, cy+Math.sin(a)*L*0.2+11]);
+    toes+=`<path d="M${f1(cx)},${f1(cy)}L${f1(ex)},${f1(ey)}" stroke="${OUT}" stroke-width="10" stroke-linecap="round"/>
+      <path d="M${f1(cx)},${f1(cy)}L${f1(ex)},${f1(ey)}" stroke="${YEL}" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="${f1(ex)}" cy="${f1(ey)}" r="6" fill="${k%2?BLUE:YEL}" stroke="${OUT}" stroke-width="1.3"/>`; });
   return `<g id="${P}-g${i}">${segs}
-    <path d="${organic(ring(cx,cy,23,20,12),1.4,730+i)}" fill="${YEL}" stroke="${OUT}" stroke-width="2"/>
-    <path d="M${f1(cx-s*18)},${f1(cy+10)} Q${f1(cx)},${f1(cy+24)} ${f1(cx+s*18)},${f1(cy+10)} L${f1(cx+s*12)},${f1(cy+6)} Q${f1(cx)},${f1(cy+14)} ${f1(cx-s*12)},${f1(cy+6)}Z" fill="${BLUE}" stroke="${OUT}" stroke-width="1.2"/>
-    <path d="${organic(ring(cx,cy,12,10,10),1,740+i)}" fill="#5fb84a" stroke="#2f6b28" stroke-width="2"/>
-    <path d="${organic(ring(cx,cy,6,5,8),0.6,745+i)}" fill="#f6efc0" stroke="${OUT}" stroke-width="1"/>
-    ${scratches(750+i,cx-20,cy-18,40,36,14,6,'#a07e10',0.8,0.4)}
+    <path d="${organic(web,1,735+i)}" fill="#7fc6e6" stroke="${OUT}" stroke-width="1.3" opacity=".9"/>
+    ${toes}
+    <path d="${organic(ring(cx,cy-2,15,11,10),1,730+i)}" fill="${YEL}" stroke="${OUT}" stroke-width="1.8"/>
+    <path d="${organic(ring(cx,cy-2,7,5,8),0.6,740+i)}" fill="#5fb84a" stroke="#2f6b28" stroke-width="1.2"/>
   </g>`;
 }
 
@@ -70,18 +76,25 @@ function markup(P){
   const BODY=organic(ring(0,0,86,110,18),2,600);
   // 斜条纹：红底上几条倾斜的黄色宽带
   const R=rng(610); let bands='';
-  for(const [y,h] of [[-96,20],[-46,24],[6,24],[58,22]]){
+  for(const [y,h] of [[-100,36],[-30,38],[42,38]]){
     const pts=[]; for(let i=0;i<=8;i++){ const x=-100+i*25; pts.push([x,y-x*0.28+Math.sin(i*0.9)*4+R()*3]); }
     for(let i=8;i>=0;i--){ const x=-100+i*25; pts.push([x,y+h-x*0.28+Math.sin(i*0.9+1)*4+R()*3]); }
     bands+=`<path d="${organic(pts,1.4,620+y,{sub:1})}" fill="${YEL}"/>`; }
   const crayon=scratches(640,-86,-110,172,220,100,14,'#7a1410',0.9,0.3,-0.5)+scratches(641,-86,-110,172,220,60,12,'#fff3a0',0.8,0.22,-0.5);
   // 脖子：从椭圆顶上竖着下来，左红右黄
-  const neckL=organic([[-48,-118],[-10,-120],[-4,-16],[-34,-14]],1.2,645,{sub:2});
-  const neckR=organic([[-10,-120],[24,-118],[27,-18],[-4,-16]],1.2,646,{sub:2});
-  const face=organic([[-33,-16],[0,-19],[30,-19],[33,28],[29,60],[14,77],[-10,80],[-27,67],[-33,30]],1.4,650,{sub:2});
-  const hatY=organic([[-29,-15],[-3,-19],[-8,-78]],0.8,660);
-  const hatBL=organic([[-34,-12],[-29,8],[-62,-26]],0.8,661), hatBR=organic([[25,-19],[32,4],[54,-46]],0.8,662);
-  const hatBM=organic([[-2,-19],[24,-19],[12,-36]],0.6,663);
+  const neckL=organic([[-48,-118],[-10,-120],[-4,70],[-30,70]],1.2,645,{sub:2});   // 脖子一直通到头的下部（被头挡住）
+  const neckR=organic([[-10,-120],[24,-118],[26,70],[-4,70]],1.2,646,{sub:2});
+  // 头：半椭圆（下边平、上面是圆弧），圆弧上长着六根很长的尖角，顺着圆弧往外放射
+  const HC=[0,80], HRX=36, HRY=98;
+  const fp=[[HRX,HC[1]],[-HRX,HC[1]]]; for(let k=1;k<12;k++){ const a=Math.PI+k/12*Math.PI; fp.push([Math.cos(a)*HRX, HC[1]+Math.sin(a)*HRY]); }
+  const face=organic(fp,1.2,650,{sub:1});
+  // 六根尖角均匀分布在脸的四周（每隔 60 度一根），从脸的中心往外放射
+  const inFace=(x,y)=>y<=HC[1] && (x/HRX)**2+((y-HC[1])/HRY)**2<=1, FC=[0,34];
+  let spikes=''; [-90,-30,30,90,150,210].forEach((deg,k)=>{ const a=deg*Math.PI/180, ux=Math.cos(a), uy=Math.sin(a);
+    let r=0; while(inFace(FC[0]+ux*(r+1),FC[1]+uy*(r+1)) && r<200) r++;
+    const bx=FC[0]+ux*(r-4), by=FC[1]+uy*(r-4), L=deg===-90?78:64, tx=bx+ux*L, ty=by+uy*L;
+    spikes+=`<path d="${organic([[bx-uy*7,by+ux*7],[tx,ty],[bx+uy*7,by-ux*7]],0.7,660+k)}" fill="${k%2?BLUE:YEL}" stroke="${OUT}" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M${f1(bx)},${f1(by)} L${f1(bx+ux*L*0.8)},${f1(by+uy*L*0.8)}" stroke="#fff" stroke-width="1.2" opacity=".35"/>`; });
   const stitches=[...Array(5)].map((_,i)=>{ const x=6+i*4.5; return `M${f1(x)},${f1(73-i*1.2)}l1,6`; }).join('');
   let dots=''; for(let i=0;i<7;i++){ const x=-42+i*14, y=98-Math.abs(x)*0.12; dots+=`<rect x="${f1(x-3)}" y="${f1(y-2)}" width="6" height="4" rx="1" fill="${OUT}" transform="rotate(${f1(x*0.4)} ${f1(x)} ${f1(y)})"/>`; }
   return `
@@ -101,16 +114,12 @@ function markup(P){
     <path d="${neckL}" fill="${RED}" stroke="${OUT}" stroke-width="1.6"/>
     <path d="${neckR}" fill="${YEL}" stroke="${OUT}" stroke-width="1.6"/>
     ${scratches(647,-46,-118,70,100,30,12,'#000',0.8,0.15,Math.PI/2)}
-    ${ao(P,'M-34,-14 Q0,-10 27,-18',8,0.4)}
     <path d="${BODY}" fill="url(#${P}-shade)"/>
   </g>
   <path d="${BODY}" fill="none" stroke="${OUT}" stroke-width="2.6"/>
   ${dots}
   <g id="${P}-face">
-    <path d="${hatBL}" fill="${BLUE}" stroke="${OUT}" stroke-width="1.5"/>
-    <path d="${hatBR}" fill="${BLUE}" stroke="${OUT}" stroke-width="1.5"/>
-    <path d="${hatY}" fill="${YEL}" stroke="${OUT}" stroke-width="1.5"/>
-    <path d="${hatBM}" fill="${BLUE}" stroke="${OUT}" stroke-width="1.3"/>
+    ${spikes}
     <path d="${face}" fill="url(#${P}-mask)" stroke="${OUT}" stroke-width="2"/>
     ${scratches(670,-30,-14,60,90,18,6,'#a89c86',0.7,0.45)}
     <path d="${organic(ring(-18,11,6.5,8.5,8),0.6,672)}" fill="${BLUE}" stroke="${OUT}" stroke-width="1.3"/>
@@ -188,7 +197,7 @@ function apply(el,o){
 window.CHARS.clownMan={
   name:'小丑怪', nameEn:'Clown-man',
   source:'clown-man/concept-source/page01d.jpg',
-  viewBox:[-245,-205,490,410], foot:[0,192], center:[0,10], top:-112, flipX:0, gameH:57,
+  viewBox:[-245,-215,490,420], foot:[0,192], center:[0,10], top:-112, flipX:0, gameH:57,
   anims:{
     idle:  {dur:2.2, frames:16},
     walk:  {dur:0.42, frames:10},

@@ -48,16 +48,31 @@ function arm(P,s){
   </g>`;
 }
 
+// 芯片：金色电路板 + 走线 + 中间一块黑色集成块，两边一排银色引脚
+function chip(x,y,w,h,seed,ic){
+  const R=rng(seed); let tr='';
+  for(let i=0;i<Math.round(w*h/60);i++){ const px=x+2+R()*(w-4), py=y+2+R()*(h-4), l=3+R()*6;
+    tr+=R()<0.5?`M${f1(px)},${f1(py)}h${f1(l)}v${f1(R()*4)}`:`M${f1(px)},${f1(py)}v${f1(l)}h${f1(R()*4)}`; }
+  let dots=''; for(let i=0;i<Math.round(w*h/90);i++) dots+=`<circle cx="${f1(x+3+R()*(w-6))}" cy="${f1(y+3+R()*(h-6))}" r=".9" fill="#7a5c10"/>`;
+  let icS=''; if(ic){ const [ix,iy,iw,ih]=ic; let pins='';
+    for(let k=0;k<Math.floor(ih/4);k++){ const py=iy+2+k*4; pins+=`M${ix-3},${py}h3M${ix+iw},${py}h3`; }
+    for(let k=0;k<Math.floor(iw/4);k++){ const px=ix+2+k*4; pins+=`M${px},${iy-3}v3M${px},${iy+ih}v3`; }
+    icS=`<path d="${pins}" stroke="#d8d8d4" stroke-width="1.4"/><rect x="${ix}" y="${iy}" width="${iw}" height="${ih}" rx="1" fill="#1d1d21" stroke="#000" stroke-width=".8"/>
+      <circle cx="${ix+2.5}" cy="${iy+2.5}" r="1" fill="#555"/><path d="M${ix+2},${iy+ih*0.6}h${iw-4}" stroke="#3a3a40" stroke-width=".8"/>`; }
+  return `<path d="${tr}" stroke="#8a6a14" stroke-width="1" fill="none"/>${dots}${icS}`;
+}
+// 冒烟：一串灰白色的烟团（i 是第几串，动画里往上飘）
+function smoke(P,i,x,y){ let d='';
+  for(let k=0;k<4;k++) d+=`<ellipse class="pf" cx="${x}" cy="${y}" rx="6" ry="5" fill="#d9d9d6" stroke="#9a9a96" stroke-width=".8" opacity=".8"/>`;
+  return `<g id="${P}-smk${i}" data-x="${x}" data-y="${y}">${d}</g>`; }
+
 function shoulder(P,s){
   const rx=x=>f1(s>0?-x:x);
   const b=organic(mir(box(-148,-128,50,74,5),s),1.3,100+s);
-  const side=organic(mir(box(-138,-56,24,58,3),s),1,102+s);
   let holes='';
   for(const y of [-112,-95,-78]) holes+=`<ellipse cx="${rx(-123)}" cy="${y}" rx="6" ry="5.4" fill="#2a2a2e" stroke="${OUT}" stroke-width="1.2"/>
     <path d="M${rx(-127)},${y-1.5}a4,4 0 0 1 ${s>0?-7:7},0" stroke="#e8e8e2" stroke-width="1" fill="none" opacity=".5"/>`;
-  return `<path d="${side}" fill="url(#${P}-shs)" stroke="${OUT}" stroke-width="1.8"/>
-    <circle cx="${rx(-126)}" cy="-30" r="2.6" fill="#2a2a2e"/><circle cx="${rx(-126)}" cy="-14" r="2.6" fill="#2a2a2e"/>
-    <path d="${b}" fill="url(#${P}-shs)" stroke="${OUT}" stroke-width="2.2"/>
+  return `<path d="${b}" fill="url(#${P}-shs)" stroke="${OUT}" stroke-width="2.2"/>
     ${scratches(110+s,s>0?100:-146,-124,46,66,12,7,'#7c7c78',0.7,0.5)}
     <path d="M${rx(-144)},-58 L${rx(-102)},-58" stroke="#000" stroke-width="2" opacity=".18"/>
     ${holes}`;
@@ -88,15 +103,13 @@ function pod(P,s){                                  // 粉色胯部舱体 + 加�
   const rx=x=>f1(s>0?-x:x);
   const shell=organic(mir(box(-150,-2,56,96,8),s),1.3,160+s);
   const win=organic(mir(box(-146,28,22,62,4),s),1,162+s);
-  const dark=organic(mir(box(-126,34,10,54,3),s),0.8,163+s);
   const band=organic(mir(box(-152,90,74,24,4),s),1,164+s);
   const R=rng(170+s); let circ='';
   for(let i=0;i<7;i++){ const y=33+i*8, x=-143+R()*6, w=3+R()*6;
     circ+=`M${rx(x)},${f1(y)}h${s>0?-w:w}v${f1(3+R()*3)}`; }
   return `<path d="${shell}" fill="url(#${P}-pink)" stroke="${OUT}" stroke-width="2.2"/>
-    <path d="${win}" fill="#e9c94a" stroke="${OUT}" stroke-width="1.5"/>
-    <path d="${circ}" stroke="#5a4a14" stroke-width="1.1" fill="none" stroke-linecap="square"/>
-    <path d="${dark}" fill="#3a3238" stroke="${OUT}" stroke-width="1.2"/>
+    <path d="${win}" fill="#e2bd3c" stroke="${OUT}" stroke-width="1.5"/>
+    ${chip(s>0?124:-146,28,22,62,166+s,[s>0?130:-140,44,10,28])}
     ${scratches(175+s,s>0?94:-150,0,56,90,12,10,'#9a4d6a',0.9,0.35,Math.PI/2)}
     ${ao(P,`M${rx(-148)},88 L${rx(-96)},88`,6,0.4)}
     <path d="${band}" fill="#f0cf2c" stroke="${OUT}" stroke-width="2"/>
@@ -111,19 +124,27 @@ function head(P){
   const capPts=[]; for(let i=0;i<=8;i++){ const a=Math.PI*1.12+i/8*Math.PI*0.76; capPts.push([Math.cos(a)*44, -124+Math.sin(a)*44]); }
   for(let i=8;i>=0;i--){ const a=Math.PI*1.12+i/8*Math.PI*0.76; capPts.push([Math.cos(a)*36, -118+Math.sin(a)*36]); }
   const cap=organic(capPts,0.8,202,{sub:1});
-  const R=rng(205); let cir='';
-  for(let i=0;i<12;i++){ const x=-28+i*5, y=-160+Math.abs(x)*0.25+R()*3; cir+=`M${f1(x)},${f1(y)}v${f1(3+R()*4)}h${f1(2+R()*3)}`; }
+  // 头分三部分：最上面是芯片，中间是眼睛和鼻子，下面是嘴巴那一块
   return `<g id="${P}-head"><g transform="translate(0,-12)">
-    <path d="${shape}" fill="url(#${P}-face)" stroke="${OUT}" stroke-width="2.2"/>
-    <path d="${cap}" fill="#d9b23a" stroke="${OUT}" stroke-width="1.4"/>
-    <path d="${cir}" stroke="#6e5512" stroke-width="1" fill="none"/>
+    <clipPath id="${P}-headc"><path d="${shape}"/></clipPath>
+    <path d="${shape}" fill="url(#${P}-face)"/>
+    <g clip-path="url(#${P}-headc)">
+      <rect x="-50" y="-175" width="100" height="38" fill="#e2bd3c"/>
+      ${chip(-44,-172,88,34,206,[-13,-160,26,14])}
+      <rect x="-50" y="-102" width="100" height="22" fill="#a8a8a2"/>
+      ${scratches(209,-44,-101,88,16,10,6,'#6e6e6a',0.7,0.5,0)}
+      <path d="M-50,-137 H50 M-50,-102 H50" stroke="${OUT}" stroke-width="1.8"/>
+      <path d="M-50,-135.5 H50" stroke="#fff" stroke-width="1" opacity=".4"/>
+      <circle cx="-36" cy="-92" r="1.8" fill="#55554f"/><circle cx="36" cy="-92" r="1.8" fill="#55554f"/>
+    </g>
+    <path d="${shape}" fill="none" stroke="${OUT}" stroke-width="2.2"/>
     ${scratches(208,-38,-148,76,56,14,7,'#9b9b95',0.7,0.45)}
     <path d="M-34,-128 L-12,-122 M34,-128 L12,-122" stroke="${OUT}" stroke-width="3.4" stroke-linecap="round"/>
     <path d="${organic([[-34,-128],[-12,-122],[-14,-115],[-32,-118]],0.6,210)}" fill="#e8742a" stroke="${OUT}" stroke-width="1.2"/>
     <path d="${organic([[34,-128],[12,-122],[14,-115],[32,-118]],0.6,211)}" fill="#e8742a" stroke="${OUT}" stroke-width="1.2"/>
     <circle cx="-22" cy="-120" r="2" fill="${OUT}"/><circle cx="22" cy="-120" r="2" fill="${OUT}"/>
-    <path d="${organic(ring(0,-110,9,8.5,9),0.6,212)}" fill="url(#${P}-nose)" stroke="${OUT}" stroke-width="1.4"/>
-    <ellipse cx="-3" cy="-113" rx="2.8" ry="1.8" fill="#fff" opacity=".6"/>
+    <path d="${organic(ring(0,-113,8,7.5,9),0.6,212)}" fill="url(#${P}-nose)" stroke="${OUT}" stroke-width="1.4"/>
+    <ellipse cx="-3" cy="-116" rx="2.6" ry="1.6" fill="#fff" opacity=".6"/>
     <path id="${P}-mouth" d="" stroke="${OUT}" stroke-width="1.4" fill="#e3712a"/>
   </g></g>`;
 }
@@ -171,6 +192,7 @@ function markup(P){
     ${pod(P,-1)}${pod(P,1)}
     <g id="${P}-armL">${arm(P,-1)}</g><g id="${P}-armR">${arm(P,1)}</g>
     ${shoulder(P,-1)}${shoulder(P,1)}
+    ${smoke(P,0,-124,-6)}${smoke(P,1,124,-6)}${smoke(P,2,-118,-130)}${smoke(P,3,118,-130)}
   </g>
 </g></g></g>
 <g id="${P}-fx"></g>`;
@@ -179,11 +201,12 @@ function markup(P){
 function bind(svg,P){
   const q=id=>svg.querySelector('#'+P+'-'+id), el={};
   for(const k of ['root','bob','torso','head','armL','armR','lL','lR','mouth','shadow','flip','puddle','drip']) el[k]=q(k);
+  el.smk=[0,1,2,3].map(i=>{ const g=q('smk'+i); return {x:+g.dataset.x, y:+g.dataset.y, pf:[...g.querySelectorAll('.pf')]}; });
   return el;
 }
 
 /* ---- 姿态 ---- */
-const BASE={bobY:0,rot:0,head:0,headY:0,aL:0,aR:0,lfL:0,lfR:0,rlL:0,rlR:0,dY:0,sq:1,alpha:1,flash:0,mouth:0,drip:0,puddle:0,headFall:0,tilt:0};
+const BASE={smk:0,bobY:0,rot:0,head:0,headY:0,aL:0,aR:0,lfL:0,lfR:0,rlL:0,rlR:0,dY:0,sq:1,alpha:1,flash:0,mouth:0,drip:0,puddle:0,headFall:0,tilt:0};
 const ATTACK=[                                         // 两臂抬起，重重砸下（慢）
   [0,{}],
   [0.4,{aL:38,aR:-38,bobY:-6,head:-6,mouth:1}],
@@ -210,8 +233,8 @@ function pose(anim,p){
   const o={...BASE}, w=p*Math.PI*2;
   if(anim==='idle'){
     o.bobY=Math.sin(w*2)*1.2; o.head=Math.sin(w)*3; o.aL=Math.sin(w)*2; o.aR=-Math.sin(w+0.6)*2;
-    o.drip=Math.max(0,Math.sin(w))*0.7;
-  } else if(anim==='walk'){                            // 很慢、很重的踏步
+    o.drip=Math.max(0,Math.sin(w))*0.7; o.smk=p;
+  } else if(anim==='walk'){ o.smk=p;                            // 很慢、很重的踏步
     const s=Math.sin(w);
     o.lfL=Math.max(0,s)*10; o.lfR=Math.max(0,-s)*10; o.rlL=s*3; o.rlR=s*3;
     o.bobY=Math.abs(s)*-4+2; o.rot=s*0.8; o.head=-s*3; o.tilt=s*0.8;
@@ -240,6 +263,10 @@ function apply(el,o){
   el.drip.setAttribute('opacity', o.drip>0.02 ? (1-dp*0.6).toFixed(2) : 0);
   S(el.drip,`translate(0,${f1(dp*110)})`);
   el.puddle.setAttribute('opacity',o.puddle.toFixed(2));
+  // 烟往上飘、变大、变淡（肩箱和胯部之间那一串飘得短一些，免得挡住肩箱）
+  el.smk.forEach((g,i)=>g.pf.forEach((c,k)=>{ const t=(o.smk*(i<2?2:1)+k/4)%1, rise=i<2?40:46;
+    c.setAttribute('cx',f1(g.x+Math.sin(t*6+k)*3*(i%2?-1:1))); c.setAttribute('cy',f1(g.y-t*rise));
+    c.setAttribute('rx',f1(5+t*7)); c.setAttribute('ry',f1(4+t*6)); c.setAttribute('opacity',(0.85*(1-t)*o.alpha).toFixed(2)); }));
   const sh=0.5+0.5*o.alpha; el.shadow.setAttribute('rx',f1(140*sh));
 }
 
